@@ -7,6 +7,7 @@
 | Flavor and version | Forever 1.60.1 |
 | Main category | Bags & Inventory |
 | Additional categories | Data Export |
+| CurseForge relations | Sintezza Theme (Required Dependency) |
 | Project license | MIT. See the repository for third-party notices. |
 
 ## Summary
@@ -21,6 +22,6 @@ Move the tracker, choose which win banner appears, or run a simulated roll to se
 
 ### Requirements
 
-Install and enable [Sintezza Theme](https://github.com/ArtefactoO/Sintezza_Theme). Use one roll tracker if you also have Clear Loot installed.
+Install and enable [Sintezza Theme](https://github.com/ArtefactoO/Sintezza_Theme). Use one roll tracker if you also have [Clear Loot](https://www.curseforge.com/wow/addons/clearloot) installed.
 
 Source, installation details, and credits are available on [GitHub](https://github.com/ArtefactoO/Sintezza_Loot).
