@@ -24,10 +24,10 @@ Move the tracker, choose which win banner appears, or run a simulated roll to se
 
 Install and enable [Sintezza Theme](https://github.com/ArtefactoO/Sintezza_Theme). Use one roll tracker if you also have [Clear Loot](https://www.curseforge.com/wow/addons/clearloot) installed.
 
-## Changelog
+<!-- Changelog field -->
+
+### Changelog
 
 [View the release history on GitHub](https://github.com/ArtefactoO/Sintezza_Loot/blob/main/CHANGELOG.md).
 
-## Source
-
-https://github.com/ArtefactoO/Sintezza_Loot
+Source, installation details, and credits are available on [GitHub](https://github.com/ArtefactoO/Sintezza_Loot).
