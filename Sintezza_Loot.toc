@@ -1,0 +1,26 @@
+## Interface: 16001
+## Title: Sintezza Loot
+## Notes: Tracks group and raid loot choices and rolls.
+## Notes-ruRU: Отслеживание выбора и бросков на добычу в группе и рейде.
+## Author: Sintezza
+## X-License: MIT
+## Version: 1.4.4
+## IconTexture: Interface\AddOns\Sintezza_Theme\Media\Icons\Sintezza_Loot
+## SavedVariables: Sintezza_LootDB
+## Dependencies: Sintezza_Theme
+
+
+Locales.lua
+Theme.lua
+Launcher.lua
+Core.lua
+RosterInspector.lua
+DataTracker.lua
+RunHistory.lua
+Data.lua
+UI\History.lua
+UI\RollEffects.lua
+UI\RollTrackerFrame.lua
+UI\MultiItemManager.lua
+Config\Settings.lua
+Test\Simulator.lua
