@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.4.6
+
+- Updated the project logo and in-game addon icon.
+
+### По-русски
+
+- Обновлены логотип проекта и игровая иконка аддона.
+
 ## 1.4.4
 
 - Localized test roll participants, item placeholders, and the unknown player label.
