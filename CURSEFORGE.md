@@ -20,9 +20,13 @@ Watch group and raid rolls as they happen. The tracker shows remaining time, eac
 
 Move the tracker, choose which win banner appears, or run a simulated roll to see how the tracker looks. CSV import and export are available from data management.
 
+### Appearance
+
+**Requires [Sintezza Theme](https://github.com/ArtefactoO/Sintezza_Theme).** Open `/stheme` to choose the palette and fonts for this addon's windows.
+
 ### Requirements
 
-Install and enable [Sintezza Theme](https://github.com/ArtefactoO/Sintezza_Theme). Open `/stheme` to change the palette and fonts used by this addon's windows. Use one roll tracker if you also have [Clear Loot](https://www.curseforge.com/wow/addons/clearloot) installed.
+Use one roll tracker if you also have [Clear Loot](https://www.curseforge.com/wow/addons/clearloot) installed.
 
 <!-- Changelog field -->
 
