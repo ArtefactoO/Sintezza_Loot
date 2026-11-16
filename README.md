@@ -30,9 +30,9 @@ The settings preview also offers group size, item count, and roll timing. Simula
 
 ## Gallery
 
-![One item's roll details and winner in the dungeon history.](Docs/01-run-history.png)
+![Items and winners in the dungeon loot history.](Docs/01-run-history.png)
 
-![A simulated winner in the standard roll tracker.](Docs/02-test-roll-result.png)
+![The My Loot tab with an expanded roll and its winner.](Docs/02-my-loot.png)
 
 ![Responses and winner in the simulated group roll.](Docs/03-test-roll.gif)
 
