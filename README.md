@@ -13,7 +13,13 @@ Install and enable **[Sintezza Theme](https://github.com/ArtefactoO/Sintezza_The
 - **My loot.** See your won items from group rolls. For items tracked since version 1.3.0, the series counter shows which recorded roll won the item. A series restarts after a win and survives pruning of its earlier entries.
 - **Data management.** Review run, roll, and win counts. Copy all data or a selected section as CSV. Import previews changes and skips duplicates. Memory measurement and confirmed clearing are available under Maintenance.
 
-The archive keeps the latest 400 completed rolls and up to 40 archived runs without rolls. The current run is tracked separately for each character. A run can remain open through a temporary exit. If the client withholds completion details, Loot closes the run at the next confirmed transition.
+The archive keeps the latest 400 completed rolls and their runs. A run is saved only after its first recorded roll; older empty runs are removed on load. Unfinished runs continue after temporary exits and corpse runs without a time limit. Successful resets, another instance or difficulty, leaving the group, or a new challenge separate runs.
+
+After confirmed completion, trash loot stays in the same run until you leave. Re-entering starts another run. A UI reload while still inside preserves the run, and delayed roll results keep the run where the roll began. Completion uses explicit completion events, a valid completed lock snapshot, or confirmed kills of every boss in an available journal list; the last listed boss alone is insufficient.
+
+When available, a changed saved-instance ID or a complete lock-prompt snapshot showing a previously killed boss alive separates the current visit. A late reply moves only that visit's recorded rolls and boss kills; earlier visits stay intact. Missing, secret, ambiguous or zero-length API data is ignored. Equal progress does not prove that a copy is unchanged. If the client supplies no distinguishing evidence, use `/sloot newrun` before the next roll to separate the history manually. The command does not reset the dungeon, and earlier records are not moved. NPC GUIDs and elapsed time are not used to infer a reset.
+
+Click a loot row to expand its participants. A small shared Theme arrow shows whether it is open. Your character has a thin outline, with the same appearance whether you win or lose.
 
 ## Commands
 
@@ -21,6 +27,7 @@ The archive keeps the latest 400 completed rolls and up to 40 archived runs with
 | --- | --- |
 | `/sloot` | Open settings |
 | `/sloot history` | Open history. The minimap dice button opens the same window |
+| `/sloot newrun` | Start a new history run without resetting the instance |
 | `/sloot move` | Position the tracker |
 | `/sloot lock` / `/sloot unlock` | Lock or unlock its position |
 | `/sloot test` / `/sloot testmulti` / `/sloot testraid` | Simulate one item, four items, or a 40-player raid roll |
@@ -45,11 +52,15 @@ Sintezza Loot is distributed under the MIT license. The roll tracker and parts o
 Sintezza Loot показывает выбор участников, броски и победителя группового розыгрыша в WoW Forever 1.60.1. Установи и включи **Sintezza Theme**. Язык выбирается в `/stheme` и применяется после перезагрузки интерфейса. Если включен Clear Loot, Sintezza Loot один раз предупредит о конфликте и продолжит запись.
 
 - **Трекер** показывает время розыгрыша и участников. Можно выбрать плашку победы Sintezza, Blizzard, обе или выключить обе. История записывается и со скрытым трекером.
-- **История** группирует розыгрыши по заходам. Поиск работает по инстансу, предмету и нику. При подтвержденном классе имя победителя окрашивается в его цвет.
+- **История** группирует розыгрыши по заходам и сохраняет только забеги с роллами. Возврат после вайпа продолжает незавершенный забег без ограничения по времени. Подтвержденный сброс, смена инстанса или сложности, выход из группы и новое испытание разделяют забеги. Нажатие на строку предмета раскрывает участников; свой персонаж отмечен тонкой рамкой. Поиск работает по инстансу, предмету и нику. При подтвержденном классе имя победителя окрашивается в его цвет.
 - **Моя добыча** показывает выигранные предметы текущего персонажа. Для записей с версии 1.3.0 указано, на какой попытке в серии удалось выиграть предмет. После победы начинается новая серия.
 - **Управление данными** показывает счетчики заходов, розыгрышей и побед. CSV поддерживает предварительную проверку импорта и пропуск дубликатов. В «Обслуживании» доступны замер памяти и очистка с подтверждением.
 
 `/sloot` открывает настройки, `/sloot history` — историю, `/sloot move` — режим перемещения трекера. Команды `/sloot test`, `/sloot testmulti` и `/sloot testraid` запускают предпросмотр, `/sloot stop` его завершает. Тесты исключаются из истории.
+
+После подтвержденного завершения добыча с треша записывается в прежний забег до выхода. Повторный вход начинает новый; `/reload` внутри сохраняет прежний. Уже начатые роллы остаются в своем забеге, даже если результат пришел после выхода. Завершение определяется отдельным событием, достоверным снимком привязки со всеми убитыми боссами или убийством всех боссов из доступного списка журнала. Последний элемент списка сам по себе не подтверждает завершение.
+
+Аддон также использует изменение ID сохранения и полный снимок окна привязки, в котором ранее убитый босс снова жив. При запоздавшем ответе в новый забег переходят только роллы и убийства боссов текущего входа. Пустые, секретные и противоречивые ответы игнорируются; одинаковый прогресс не доказывает, что копия осталась прежней. Если данных недостаточно, `/sloot newrun` перед следующим роллом начнет отдельный забег в истории. Команда не сбрасывает инстанс и не переносит прежние записи. По времени отсутствия и GUID цели сброс не определяется.
 
 В трекере использованы адаптации кода Clear Loot. [Лицензия MIT](LICENSE) · [История изменений](CHANGELOG.md)
 

@@ -1,7 +1,7 @@
 local addonName, ns = ...
 local L, H = ns.L, ns.History
 local Transfer = Sintezza_Theme.DataTransfer
-local ROLL_LIMIT, EMPTY_RUN_LIMIT = 400, 40
+local ROLL_LIMIT, IMPORT_ROW_LIMIT = 400, 840
 
 local function Plain(value, max)
     return type(value) == "string" and #value > 0 and #value <= max and not value:find("[%z\001-\031\127|]")
@@ -62,12 +62,33 @@ end
 
 local function RunKind(value) return value == "party" or value == "raid" end
 local function EndReason(value)
-    return value == "completed" or value == "reset" or value == "left" or value == "imported"
+    return value == "completed" or value == "reset" or value == "left" or value == "imported" or value == "manual"
+end
+local function BossNames(value)
+    if type(value) ~= "table" then return false end
+    local count = 0
+    for name, dead in pairs(value) do
+        count = count + 1
+        if count > 100 or not Name(name) or not Boolean(dead) then return false end
+    end
+    return true
+end
+local function EncounterKills(value)
+    if type(value) ~= "table" then return false end
+    local count = 0
+    for id, dead in pairs(value) do
+        count = count + 1
+        if count > 100 or not Positive(id) or dead ~= true then return false end
+    end
+    return true
 end
 local runFields = {
     name = Name, kind = RunKind, difficulty = Nonnegative, mapID = Positive, character = Character,
     startedAt = Stamp, endedAt = Stamp, endReason = EndReason,
     instanceCopy = function(value) return Plain(value, 80) and value:match("^[%d%-]+$") end,
+    lockoutKey = function(value) return Plain(value, 80) and value:match("^%d+:%d+$") end,
+    killedEncounters = EncounterKills, killedBossNames = BossNames, lockProgress = BossNames,
+    progressLocale = function(value) return Plain(value, 10) end,
 }
 local function Run(value)
     return Shape(value, runFields) and value.name and value.kind and value.mapID and value.startedAt and value.character
@@ -175,7 +196,7 @@ local function ActiveIDs()
 end
 
 local function Stage(rows)
-    if #rows > ROLL_LIMIT * 2 + EMPTY_RUN_LIMIT then return nil, L.DATA_LIMIT end
+    if #rows > IMPORT_ROW_LIMIT then return nil, L.DATA_LIMIT end
     local knownRuns, knownRolls, index, occupied = {}, {}, {}, {}
     for id, run in pairs(ns.db.lootRuns) do knownRuns[RunID(run)] = id end
     for _, roll in ipairs(ns.db.rollHistory) do
@@ -228,12 +249,15 @@ local function Stage(rows)
             plan.added = plan.added + 1
         end
     end
-    local empty, active = 0, ActiveIDs()
-    for id, run in pairs(ns.db.lootRuns) do
-        if not active[id] and not occupied[RunID(run)] then empty = empty + 1 end
+    local skipped = 0
+    for index = #plan.runs, 1, -1 do
+        if not occupied[RunID(plan.runs[index])] then
+            table.remove(plan.runs, index)
+            plan.added, skipped = plan.added - 1, skipped + 1
+        end
     end
-    for _, run in ipairs(plan.runs) do if not occupied[RunID(run)] then empty = empty + 1 end end
-    if #ns.db.rollHistory + #plan.rolls > ROLL_LIMIT or empty > EMPTY_RUN_LIMIT then return nil, L.DATA_LIMIT end
+    if skipped > 0 then plan.message = L.DATA_IMPORT_EMPTY:format(plan.added, plan.duplicates, skipped) end
+    if #ns.db.rollHistory + #plan.rolls > ROLL_LIMIT then return nil, L.DATA_LIMIT end
     return plan
 end
 
@@ -256,6 +280,7 @@ local function Apply(plan)
         if a.time ~= b.time then return a.time > b.time end
         return order[a] < order[b]
     end)
+    H:TrimRuns()
     return true
 end
 

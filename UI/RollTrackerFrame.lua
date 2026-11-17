@@ -10,7 +10,8 @@ ns.RollTrackerFrame = RollTrackerFrame
 local WINDOW_WIDTH_ICONS = 324
 local WINDOW_WIDTH_TEXT  = 360
 local WINDOW_WIDTH_BOTH  = 378
-local HEADER_HEIGHT = 56
+local ITEM_HEADER_HEIGHT = 34
+local HEADER_HEIGHT = ITEM_HEADER_HEIGHT + 26
 local FOOTER_HEIGHT = 26
 local ROW_HEIGHT = 20
 local MIN_VISIBLE_ROWS = 5
@@ -363,7 +364,7 @@ function RollTrackerFrame:Init()
     local header = CreateFrame("Frame", nil, frame, "BackdropTemplate")
     header:SetPoint("TOPLEFT", 1, -1)
     header:SetPoint("TOPRIGHT", -1, -1)
-    header:SetHeight(30)
+    header:SetHeight(ITEM_HEADER_HEIGHT)
     T:HeaderSurface(header)
 
     frame.scrollOffset = 0
@@ -418,7 +419,7 @@ function RollTrackerFrame:Init()
         end
     end)
     closeBtn:SetSize(24, 24)
-    closeBtn:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -2, -2)
+    closeBtn:SetPoint("TOPRIGHT", header, "TOPRIGHT", -1, -1)
     closeBtn:HookScript("OnEnter", function(self)
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
         GameTooltip:SetText(L.TOOLTIP_CLOSE_ITEM, 1, 0.82, 0)
@@ -429,7 +430,7 @@ function RollTrackerFrame:Init()
 
     -- Item Header Button (Icon + Item Link/Name, hoverable for item tooltip)
     local itemHeader = CreateFrame("Button", nil, header)
-    itemHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -8)
+    itemHeader:SetPoint("TOPLEFT", header, "TOPLEFT", 9, -1)
     local logo = header:CreateTexture(nil, "ARTWORK")
     logo:SetSize(18, 18)
     logo:SetPoint("RIGHT", closeBtn, "LEFT", -5, 0)
@@ -477,8 +478,8 @@ function RollTrackerFrame:Init()
 
     -- Column Headers Row
     local colHeader = CreateFrame("Frame", nil, frame)
-    colHeader:SetPoint("TOPLEFT", frame, "TOPLEFT", 10, -34)
-    colHeader:SetPoint("TOPRIGHT", frame, "TOPRIGHT", -10, -34)
+    colHeader:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 9, -3)
+    colHeader:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", -9, -3)
     colHeader:SetHeight(16)
 
     local hRank = colHeader:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")

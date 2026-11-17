@@ -2,8 +2,10 @@ local _, ns = ...
 local H = {}
 ns.History = H
 
-local LIMIT_ROLLS, LIMIT_EMPTY_RUNS = 400, 40
+local LIMIT_ROLLS = 400
 local removedRolls = setmetatable({}, { __mode = "k" })
+-- Sessions retain pending runs until delayed roll results arrive.
+local pendingRuns = setmetatable({}, { __mode = "v" })
 local CHOICE_ORDER = { [1] = 4, [2] = 3, [3] = 2, [0] = 1, [-1] = 0 }
 local CYR_UPPER = "АБВГДЕ\208\129ЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 local CYR_LOWER = "абвгде\209\145жзийклмнопрстуфхцчшщъыьэюя"
@@ -72,27 +74,22 @@ end
 
 function H:GetActiveRun()
     local id = self.character and ns.db.activeLootRuns[self.character]
-    return id and ns.db.lootRuns[id]
+    return self.activeRun or (id and ns.db.lootRuns[id])
+end
+
+function H:GetRun(id)
+    return id and (ns.db.lootRuns[id] or pendingRuns[id])
 end
 
 local function Instance()
     if type(GetInstanceInfo) ~= "function" then return end
     local name, kind, difficulty, _, _, _, _, mapID = GetInstanceInfo()
     name, kind, difficulty, mapID = Public(name), Public(kind), Public(difficulty), Public(mapID)
-    if (kind == "party" or kind == "raid") and type(name) == "string" and type(mapID) == "number" and mapID > 0 then
+    if (kind == "party" or kind == "raid") and type(name) == "string" and type(difficulty) == "number"
+        and type(mapID) == "number" and mapID > 0 then
         return name, kind, difficulty, mapID
     end
-end
-
-local function TargetInstance()
-    if type(UnitGUID) ~= "function" then return end
-    for _, unit in ipairs({ "boss1", "target" }) do
-        local guid = Public(UnitGUID(unit))
-        if type(guid) == "string" then
-            local copy, zone = guid:match("^Creature%-%d+%-(%d+%-%d+%-(%d+))%-")
-            if copy and tonumber(zone) > 0 then return copy end
-        end
-    end
+    return nil, nil, nil, nil, kind == "none" or kind == "pvp" or kind == "arena" or kind == "scenario"
 end
 
 function H:UpdateView()
@@ -104,123 +101,183 @@ function H:TrimRuns()
     for _, entry in ipairs(ns.db.rollHistory) do
         if entry.runID then keep[entry.runID] = true end
     end
-    for _, id in pairs(ns.db.activeLootRuns) do keep[id] = true end
-    for _, id in pairs(ns.db.lootRunPresence) do keep[id] = true end
-    if self.insideRunID then keep[self.insideRunID] = true end
-    local empty = {}
     for id, run in pairs(ns.db.lootRuns) do
-        if not keep[id] then empty[#empty + 1] = run end
+        if not keep[id] then
+            pendingRuns[id] = run
+            ns.db.lootRuns[id] = nil
+        end
     end
-    if #empty <= LIMIT_EMPTY_RUNS then return end
-    table.sort(empty, function(a, b) return a.id > b.id end)
-    for i = LIMIT_EMPTY_RUNS + 1, #empty do ns.db.lootRuns[empty[i].id] = nil end
+    for _, links in ipairs({ ns.db.activeLootRuns, ns.db.lootRunPresence }) do
+        for character, id in pairs(links) do
+            if not keep[id] then links[character] = nil end
+        end
+    end
+    for character, visit in pairs(ns.db.lootRunVisits) do
+        if not keep[visit.runID] then ns.db.lootRunVisits[character] = nil end
+    end
 end
 
-function H:Archive(reason)
+function H:SaveRun(run)
+    ns.db.lootRuns[run.id] = run
+    if self:GetActiveRun() == run then ns.db.activeLootRuns[self.character] = run.id end
+    if self.presenceRun == run then ns.db.lootRunPresence[self.character] = run.id end
+    self:SaveVisit()
+end
+
+function H:SaveVisit()
+    local visit = self.visit
+    if visit and ns.db.lootRuns[visit.run.id] then
+        ns.db.lootRunVisits[self.character] = { id = visit.id, runID = visit.run.id, startedAt = visit.startedAt,
+            baselineDead = visit.baselineDead, baselineLocale = visit.baselineLocale, baselineLockoutKey = visit.baselineLockoutKey,
+            killedEncounters = visit.killedEncounters, killedBossNames = visit.killedBossNames,
+            previousKills = visit.previousKills, previousNames = visit.previousNames }
+    end
+end
+
+function H:StartVisit(run, reload)
+    local saved = reload and ns.db.lootRunVisits[self.character]
+    if saved and saved.runID == run.id then
+        self.visit = { id = saved.id, startedAt = saved.startedAt, run = run,
+            baselineDead = saved.baselineDead, baselineLocale = saved.baselineLocale, baselineLockoutKey = saved.baselineLockoutKey,
+            killedEncounters = saved.killedEncounters, killedBossNames = saved.killedBossNames,
+            previousKills = saved.previousKills, previousNames = saved.previousNames }
+    else
+        ns.db.nextLootVisitID = ns.db.nextLootVisitID + 1
+        local dead = {}
+        for name, killed in pairs(run.lockProgress or {}) do if killed then dead[name] = true end end
+        for name, killed in pairs(run.killedBossNames or {}) do if killed then dead[name] = true end end
+        self.visit = { id = ns.db.nextLootVisitID, startedAt = Clock(), run = run,
+            baselineDead = dead, baselineLocale = run.progressLocale, baselineLockoutKey = run.lockoutKey }
+    end
+    self.lockRequestVisitID, self.requestLockInfoAfterCombat = nil, nil
+    self:SaveVisit()
+end
+
+function H:Archive(reason, endedAt)
     local run = self:GetActiveRun()
     if not run then return end
-    run.endedAt = Clock()
+    run.endedAt = math.max(run.startedAt, endedAt or Clock())
     run.endReason = reason
+    self.activeRun = nil
     ns.db.activeLootRuns[self.character] = nil
-    if reason ~= "completed" then ns.db.lootRunPresence[self.character] = nil end
+    if reason ~= "completed" then
+        self.presenceRun = nil
+        ns.db.lootRunPresence[self.character] = nil
+    end
     -- Keep the in-instance association for rolls delivered after the finish event.
-    if self.insideRunID ~= run.id then self.checkInstanceCopy = false end
     self:TrimRuns()
     self:UpdateView()
 end
 
-function H:BeginRun(name, kind, difficulty, mapID, copy)
+function H:BeginRun(name, kind, difficulty, mapID, visit)
     local id = ns.db.nextLootRunID + 1
     ns.db.nextLootRunID = id
     local run = { id = id, name = name, kind = kind, difficulty = difficulty, mapID = mapID,
-        character = self.character, startedAt = Clock(), instanceCopy = copy }
-    ns.db.lootRuns[id] = run
-    ns.db.activeLootRuns[self.character] = id
-    ns.db.lootRunPresence[self.character] = id
+        character = self.character, startedAt = visit and visit.startedAt or Clock() }
+    pendingRuns[id] = run
+    self.activeRun, self.presenceRun = run, run
+    ns.db.activeLootRuns[self.character] = nil
+    ns.db.lootRunPresence[self.character] = nil
     self.insideRunID = id
-    self.checkInstanceCopy = false
+    if visit then
+        visit.run, self.visit = run, visit
+        visit.baselineDead, visit.baselineLocale, visit.baselineLockoutKey = nil, nil, nil
+    else
+        self:StartVisit(run)
+    end
     self:TrimRuns()
     return run
 end
 
-function H:ObserveInstance(forceNew)
+function H:CloseRun(reason)
+    if not self.character then return end
+    self:Archive(reason)
+    self.insideRunID, self.presenceRun, self.visit = nil, nil, nil
+    self.lockPrompt = nil
+    self.lockRequestVisitID, self.requestLockInfoAfterCombat = nil, nil
+    ns.db.lootRunPresence[self.character] = nil
+    ns.db.lootRunVisits[self.character] = nil
+    self:UpdateView()
+end
+
+function H:StartNewRun()
+    self:ObserveInstance()
+    if not self.character then return false end
+    self:CloseRun("manual")
+    self:ObserveInstance()
+    return true
+end
+
+function H:SplitVisit(reason)
+    local visit = self.visit
+    if not visit then return end
+    local old = visit.run
+    self:Archive(reason, visit.startedAt)
+    local run = self:BeginRun(old.name, old.kind, old.difficulty, old.mapID, visit)
+    for id, previous in pairs(visit.previousKills or {}) do old.killedEncounters[id] = previous or nil end
+    for name, previous in pairs(visit.previousNames or {}) do old.killedBossNames[name] = previous or nil end
+    run.killedEncounters, run.killedBossNames = visit.killedEncounters, visit.killedBossNames
+    if run.killedBossNames then run.progressLocale = GetLocale() end
+    visit.previousKills, visit.previousNames = nil, nil
+    for _, entry in ipairs(ns.db.rollHistory) do
+        if entry.character == self.character and entry.visitID == visit.id and entry.runID == old.id then
+            entry.runID = run.id
+            self:SaveRun(run)
+        end
+    end
+    self:TrimRuns()
+    self:SaveVisit()
+    self:UpdateView()
+    return run
+end
+
+function H:ObserveInstance(forceNew, reload)
     self.character = self.character or (type(UnitGUID) == "function" and Public(UnitGUID("player")))
     if type(self.character) ~= "string" then self.character = nil; return end
 
-    local name, kind, difficulty, mapID = Instance()
+    local name, kind, difficulty, mapID, outside = Instance()
     local previousInside = self.insideRunID
     if not name then
+        if forceNew then self:CloseRun("reset") end
+        if not outside then return end
+        local run = self:GetRun(previousInside) or self.presenceRun or self:GetRun(ns.db.lootRunPresence[self.character])
+        if run and run.endReason == "completed" then
+            self.presenceRun = nil
+            ns.db.lootRunPresence[self.character] = nil
+        end
         self.insideRunID = nil
-        self.checkInstanceCopy = false
+        self.visit, self.lockPrompt = nil, nil
+        ns.db.lootRunVisits[self.character] = nil
         if previousInside then self:UpdateView() end
         return
     end
 
     local savedID = ns.db.lootRunPresence[self.character]
-    local run = ns.db.lootRuns[previousInside or savedID] or self:GetActiveRun()
+    local run = self:GetRun(previousInside) or self.presenceRun or self:GetRun(savedID) or self:GetActiveRun()
     local sameMap = run and run.mapID == mapID and run.kind == kind and run.difficulty == difficulty
-    if forceNew or not sameMap then
+    local savedVisit = ns.db.lootRunVisits[self.character]
+    local wasInside = sameMap and savedVisit and savedVisit.runID == run.id
+    local finishedVisit = sameMap and run.endReason == "completed" and not previousInside and not reload and not wasInside
+    if forceNew or not sameMap or finishedVisit then
         self:Archive(forceNew and "reset" or "left")
         self:BeginRun(name, kind, difficulty, mapID)
     else
         self.insideRunID = run.id
-        ns.db.lootRunPresence[self.character] = run.id
-        if not previousInside and run.instanceCopy then self.checkInstanceCopy = true end
+        self.presenceRun = run
+        if self:GetActiveRun() == run then self.activeRun = run end
+        if ns.db.lootRuns[run.id] then ns.db.lootRunPresence[self.character] = run.id end
+        if not self.visit then self:StartVisit(run, reload) end
     end
     if forceNew or previousInside ~= self.insideRunID then self:UpdateView() end
 end
 
-function H:ObserveTarget()
-    local run = ns.db.lootRuns[self.insideRunID]
-    if not run or (run.instanceCopy and not self.checkInstanceCopy) then return end
-    local copy = TargetInstance()
-    if not copy then return end
-    self.checkInstanceCopy = false
-    if not run.instanceCopy then
-        run.instanceCopy = copy
-    elseif copy ~= run.instanceCopy then
-        self:Archive("left")
-        self:BeginRun(run.name, run.kind, run.difficulty, run.mapID, copy)
-        self:UpdateView()
-    end
-end
-
 function H:GetRollRunID()
     self:ObserveInstance()
-    self:ObserveTarget()
-    return self.insideRunID or false
-end
-
-function H:CheckEncounterCompletion()
-    local run = self:GetActiveRun()
-    if not run or run.id ~= self.insideRunID or self.lastSuccessfulRun ~= run.id
-        or type(GetInstanceLockTimeRemaining) ~= "function" then return end
-    if C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive
-        and Public(C_ChallengeMode.IsChallengeModeActive()) == true then return end
-    local _, _, total, completed = GetInstanceLockTimeRemaining()
-    total, completed = Public(total), Public(completed)
-    if type(total) == "number" and total > 0 and completed == total then self:Archive("completed") end
-end
-
-function H:CheckLastBoss(encounterID)
-    local run = self:GetActiveRun()
-    if not run or run.id ~= self.insideRunID or type(encounterID) ~= "number" then return end
-    if C_ChallengeMode and C_ChallengeMode.IsChallengeModeActive
-        and Public(C_ChallengeMode.IsChallengeModeActive()) == true then return end
-    if not (C_EncounterJournal and C_EncounterJournal.GetInstanceForGameMap and EJ_GetEncounterInfoByIndex) then return end
-    local journalID = Public(C_EncounterJournal.GetInstanceForGameMap(run.mapID))
-    if type(journalID) ~= "number" or journalID <= 0 then return end
-    local finalID
-    for index = 1, 40 do
-        local name, _, _, _, _, _, id = EJ_GetEncounterInfoByIndex(index, journalID)
-        if type(Public(name)) ~= "string" then break end
-        finalID = Public(id)
-    end
-    if finalID == encounterID then self:Archive("completed") end
+    return self.insideRunID or false, self:GetRun(self.insideRunID), self.visit
 end
 
 function H:Init()
-    for _, key in ipairs({ "lootRuns", "activeLootRuns", "lootRunPresence", "lootAttemptCarry" }) do
+    for _, key in ipairs({ "lootRuns", "activeLootRuns", "lootRunPresence", "lootAttemptCarry", "lootRunVisits" }) do
         if type(ns.db[key]) ~= "table" then ns.db[key] = {} end
     end
     if type(ns.db.nextLootRunID) ~= "number" then
@@ -229,27 +286,35 @@ function H:Init()
             if type(id) == "number" then ns.db.nextLootRunID = math.max(ns.db.nextLootRunID, id) end
         end
     end
-    ns:RegisterEvent("PLAYER_ENTERING_WORLD", function()
-        self:ObserveInstance()
-        self:ObserveTarget()
+    if type(ns.db.nextLootVisitID) ~= "number" then
+        ns.db.nextLootVisitID = 0
+        for _, entry in ipairs(ns.db.rollHistory) do
+            if type(entry.visitID) == "number" then ns.db.nextLootVisitID = math.max(ns.db.nextLootVisitID, entry.visitID) end
+        end
+    end
+    for character, visit in pairs(ns.db.lootRunVisits) do
+        if type(visit) ~= "table" or type(visit.id) ~= "number" or type(visit.startedAt) ~= "number" then
+            ns.db.lootRunVisits[character] = nil
+        else
+            ns.db.nextLootVisitID = math.max(ns.db.nextLootVisitID, visit.id)
+        end
+    end
+    self:TrimRuns()
+    ns:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, _, reload)
+        self.lockPrompt = nil
+        self:ObserveInstance(false, Public(reload) == true)
+        self:RequestLockInfo()
     end)
-    ns:RegisterEvent("PLAYER_TARGET_CHANGED", function() self:ObserveTarget() end)
     ns:RegisterEvent("GROUP_LEFT", function()
         if self.character and type(IsInGroup) == "function" and Public(IsInGroup()) == false then
-            ns.db.lootRunPresence[self.character] = nil
-            self:Archive("left")
+            self:CloseRun("left")
         end
     end)
     ns:RegisterEvent("CHALLENGE_MODE_START", function()
-        if self:GetActiveRun() then return end
         self:ObserveInstance(true)
     end)
     ns:RegisterEvent("CHALLENGE_MODE_RESET", function()
-        if self.insideRunID then
-            self:Archive("reset")
-            self.insideRunID = nil
-            ns.db.lootRunPresence[self.character] = nil
-        end
+        self:CloseRun("reset")
     end)
     for _, event in ipairs({ "LFG_COMPLETION_REWARD", "CHALLENGE_MODE_COMPLETED" }) do
         ns:RegisterEvent(event, function()
@@ -257,23 +322,16 @@ function H:Init()
             if run and run.id == self.insideRunID then self:Archive("completed") end
         end)
     end
-    ns:RegisterEvent("ENCOUNTER_END", function(_, encounterID, _, _, _, success)
-        if Public(success) == 1 then
-            self.lastSuccessfulRun = self.insideRunID
-            self:CheckEncounterCompletion()
-            self:CheckLastBoss(Public(encounterID))
-        end
-    end)
-    ns:RegisterEvent("UPDATE_INSTANCE_INFO", function() self:CheckEncounterCompletion() end)
+    self:InitRunEvidence()
     ns:RegisterEvent("CHAT_MSG_SYSTEM", function(_, message)
+        self:ObserveInstance()
         if not self.character or self.insideRunID or type(Public(message)) ~= "string" then return end
-        local run = ns.db.lootRuns[ns.db.lootRunPresence[self.character]]
+        local run = self.presenceRun or self:GetRun(ns.db.lootRunPresence[self.character]) or self:GetActiveRun()
         local format = INSTANCE_RESET_SUCCESS
         if run and type(format) == "string" then
             format = format:gsub("%%1%$s", "%%s")
             if format:find("%s", 1, true) and message == format:format(run.name) then
-                ns.db.lootRunPresence[self.character] = nil
-                self:Archive("reset")
+                self:CloseRun("reset")
             end
         end
     end)
@@ -330,15 +388,22 @@ function H:Record(session)
         session.historySignatureChecked = true
     end
     if not record then
-        local runID = session.historyRunID
+        local visit = session.historyVisit
+        local runID = visit and visit.run.id or session.historyRunID
+        session.historyRunID = runID
         record = {
             time = session.historyStartedAt or Clock(),
             runID = runID or nil,
             outside = runID == false or nil,
             character = self.character,
+            visitID = visit and visit.id,
         }
         session.historyEntry = record
         table.insert(history, 1, record)
+        local run = (visit and visit.run) or self:GetRun(runID) or session.historyRun
+        if run and run.id == runID then
+            self:SaveRun(run)
+        end
         if #history > LIMIT_ROLLS then
             CarryAttempt(table.remove(history))
             self:TrimRuns()
@@ -468,7 +533,6 @@ function H:FindRuns(text)
         return groups[key]
     end
 
-    for id, run in pairs(ns.db.lootRuns) do Group(id, run) end
     for _, entry in ipairs(ns.db.rollHistory) do
         local run = entry.runID and ns.db.lootRuns[entry.runID]
         local key = run and entry.runID or (entry.outside and "outside" or "legacy")
@@ -483,7 +547,7 @@ function H:FindRuns(text)
 
     for _, group in pairs(groups) do
         group.name = group.name or group.run.name
-        if #group.entries > 0 or (group.run and self:Matches(group.name, query)) then
+        if #group.entries > 0 then
             results[#results + 1] = group
         end
     end

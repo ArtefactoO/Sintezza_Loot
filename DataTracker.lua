@@ -342,7 +342,7 @@ function DataTracker:CreateOrUpdateRollSession(rollID, data)
 
         if not session.isSimulated then
             session.historyStartedAt = GetServerTime and GetServerTime() or time()
-            session.historyRunID = ns.History:GetRollRunID()
+            session.historyRunID, session.historyRun, session.historyVisit = ns.History:GetRollRunID()
             local members = ns.RosterInspector:GetEligibleGroupMembers()
             for _, m in ipairs(members) do
                 local short = ns.RosterInspector:GetShortName(m.name)

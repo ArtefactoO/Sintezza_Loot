@@ -1,4 +1,6 @@
 package-as: Sintezza_Loot
+ignore:
+  - Tests
 manual-changelog:
   filename: CHANGELOG.md
   markup-type: markdown

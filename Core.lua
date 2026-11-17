@@ -6,7 +6,7 @@ ns.ICON = Sintezza_Theme.icons.Sintezza_Loot
 local rawVersion = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
     or (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version"))
 if not rawVersion or rawVersion:find("project%-version") then
-    rawVersion = "1.4.6"
+    rawVersion = "1.5.0"
 end
 ns.VERSION = rawVersion
 ns.DEFAULT_AUTO_CLOSE_DELAY = 10
@@ -240,6 +240,8 @@ local function ExecuteSlashCommand(msg)
         end
     elseif cmd == "history" then
         ns.History:Toggle()
+    elseif cmd == "newrun" then
+        if ns.History:StartNewRun() then ns:Print(L.MSG_NEW_RUN) end
     elseif cmd == "move" then
         if ns.RollTrackerFrame and ns.RollTrackerFrame.ToggleMoveMode then
             ns.RollTrackerFrame:ToggleMoveMode()
@@ -261,6 +263,7 @@ local function ExecuteSlashCommand(msg)
         ns:Print(L.SLASH_HELP_STOP)
         ns:Print(L.SLASH_HELP_SHOW)
         ns:Print(L.SLASH_HELP_HISTORY)
+        ns:Print(L.SLASH_HELP_NEWRUN)
         ns:Print(L.SLASH_HELP_MOVE)
         ns:Print(L.SLASH_HELP_LOCK)
         ns:Print(L.SLASH_HELP_CONFIG)

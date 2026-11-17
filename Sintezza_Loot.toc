@@ -4,7 +4,7 @@
 ## Notes-ruRU: Отслеживание выбора и бросков на добычу в группе и рейде.
 ## Author: Sintezza
 ## X-License: MIT
-## Version: 1.4.6
+## Version: 1.5.0
 ## IconTexture: Interface\AddOns\Sintezza_Theme\Media\Icons\Sintezza_Loot
 ## SavedVariables: Sintezza_LootDB
 ## Dependencies: Sintezza_Theme
@@ -17,6 +17,7 @@ Core.lua
 RosterInspector.lua
 DataTracker.lua
 RunHistory.lua
+RunEvidence.lua
 Data.lua
 UI\History.lua
 UI\RollEffects.lua

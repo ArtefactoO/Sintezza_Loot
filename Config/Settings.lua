@@ -8,6 +8,10 @@ ns.WindowAppearance = Sintezza_Theme:NewWindowPreferences(function() return ns.d
 ns.TrackerAppearance = Sintezza_Theme:NewWindowPreferences(function() return ns.db end, function(db)
     return { scale = db.windowScale, opacity = db.windowOpacity }
 end, "trackerAppearance")
+if Sintezza_Theme.RegisterGlobalWindowPreferences then
+    Sintezza_Theme:RegisterGlobalWindowPreferences("Sintezza Loot", ns.WindowAppearance)
+    Sintezza_Theme:RegisterGlobalWindowPreferences("Sintezza Loot", ns.TrackerAppearance)
+end
 
 function ns.WindowAppearance:OnReset()
     ns.db.settingsPosition = nil
@@ -143,7 +147,10 @@ function SettingsModule:Init()
         button:SetPoint("TOPRIGHT", sidebar, "TOPRIGHT", 0, navY)
         navY = navY - button:GetHeight()
         buttons[key] = button
-        page = W:Card(body, heading or title)
+        local hasHeading = heading and heading ~= title
+        page = hasHeading and W:Section(body, heading, nil, "settings") or CreateFrame("Frame", nil, body)
+        page.settingsTop = hasHeading and -(page.headerHeight + 4) or 0
+        page.settingsInset = hasHeading and W.CONTROL_INSET or 0
         page:SetPoint("TOPLEFT")
         page:SetPoint("TOPRIGHT")
         page:Hide()
@@ -152,12 +159,12 @@ function SettingsModule:Init()
     end
 
     local function Relayout(card)
-        local y = -36
+        local y, inset = card.settingsTop, card.settingsInset
         for _, row in ipairs(card.rows) do
             if row:IsShown() then
                 row:ClearAllPoints()
-                row:SetPoint("TOPLEFT", card, "TOPLEFT", W.CARD_INSET, y)
-                row:SetPoint("TOPRIGHT", card, "TOPRIGHT", -W.CARD_INSET, y)
+                row:SetPoint("TOPLEFT", card, "TOPLEFT", inset, y)
+                row:SetPoint("TOPRIGHT", card, "TOPRIGHT", -inset, y)
                 y = y - row:GetHeight() - row.settingsGap
             end
         end
