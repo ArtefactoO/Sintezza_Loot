@@ -102,7 +102,7 @@ local function CreateItemRow(parent)
     row.icon = row:CreateTexture(nil, "ARTWORK")
     row.icon:SetSize(22, 22)
     row.icon:SetPoint("LEFT", 23, 0)
-    row.border = T:FrameIcon(row, row.icon)
+    row.border = ns:FrameItemIcon(row, row.icon)
     local function ToggleRoll()
         H.entry = H.entry ~= row.entry and row.entry or nil
         H:Refresh()
@@ -257,14 +257,10 @@ function H:Create()
     end)
     header:SetScript("OnDragStop", function() frame:StopMovingOrSizing() end)
     local settings = W:Button(header, L.HISTORY_SETTINGS, function()
-        ns.Settings:OpenFromHistory()
+        ns.Settings:OpenSettings()
     end)
     settings:SetWidth(100)
     settings:SetPoint("RIGHT", header.close, "LEFT", -4, 0)
-    header.title:ClearAllPoints()
-    header.title:SetPoint("LEFT", header, "LEFT", 53, 0)
-    header.title:SetPoint("RIGHT", settings, "LEFT", -8, 0)
-
     self.tab = "runs"
     self.tabEntries = {}
     local tabs = W:Segmented(frame, { L.HISTORY_RUNS, L.HISTORY_PERSONAL }, { "runs", "personal" },
@@ -272,10 +268,6 @@ function H:Create()
     tabs:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 12, -4)
     tabs:SetWidth(216)
     tabs:Refresh()
-    local manage = W:Button(frame, L.DATA_MANAGE, function() ns.Settings:OpenDataFromHistory() end)
-    manage:SetWidth(164)
-    manage:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", -14, -5)
-
     local search = W:EditBox(frame, L.HISTORY_SEARCH)
     search:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 12, -43)
     search:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", -100, -43)
@@ -460,11 +452,11 @@ function H:Refresh(useMatch, resetScroll)
         local open = self.entry == entry
         local r, g, b = ns.GetItemQualityColor(entry.quality)
         row.icon:SetTexture(entry.icon or 134400)
-        T:PaintItemBorder(row.border, entry.quality, r, g, b)
+        row.border:SetBackdropBorderColor(r, g, b, .9)
         row.name:SetText(self:GetItemName(entry))
         row.name:SetTextColor(r, g, b, 1)
         local stamp = entry.time and date(run and "%H:%M" or "%d.%m %H:%M", entry.time) or ""
-        local context = personal and self:GetRunName(entry) or entry.source
+        local context = personal and self:GetRunName(entry) or self:GetSourceName(entry)
         if context then stamp = stamp == "" and context or stamp .. " · " .. context end
         local attempt = attempts and attempts[entry]
         if attempt then stamp = stamp .. " · " .. L.HISTORY_WON_ATTEMPT:format(attempt) end
@@ -501,11 +493,9 @@ function H:Open()
 end
 
 function H:Toggle()
-    if ns.Settings:ReturnToHistory() then return end
     if self.frame and self.frame:IsShown() then
         self.frame:Hide()
     else
-        ns.Settings:Hide()
         self:Open()
     end
 end

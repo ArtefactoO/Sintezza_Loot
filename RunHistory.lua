@@ -7,6 +7,10 @@ local removedRolls = setmetatable({}, { __mode = "k" })
 -- Sessions retain pending runs until delayed roll results arrive.
 local pendingRuns = setmetatable({}, { __mode = "v" })
 local CHOICE_ORDER = { [1] = 4, [2] = 3, [3] = 2, [0] = 1, [-1] = 0 }
+local requestedItems = {}
+local requestedQuests = {}
+-- This quest has the same title as the Forever instance in the English and Russian client data.
+local instanceTitleQuests = { [2970] = 95775 }
 local CYR_UPPER = "АБВГДЕ\208\129ЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
 local CYR_LOWER = "абвгде\209\145жзийклмнопрстуфхцчшщъыьэюя"
 local lower = {}
@@ -69,7 +73,75 @@ function H:Matches(value, query)
 end
 
 function H:GetItemName(entry)
+    local link = Public(entry.link)
+    local id = type(link) == "string" and tonumber(link:match("|Hitem:(%d+)"))
+    if id and type(ns.GetItemInfo) == "function" then
+        local ok, name = pcall(ns.GetItemInfo, link)
+        name = ok and Public(name)
+        if type(name) == "string" and name ~= "" then return name end
+        if not requestedItems[id] and C_Item and type(C_Item.RequestLoadItemDataByID) == "function" then
+            requestedItems[id] = true
+            pcall(C_Item.RequestLoadItemDataByID, id)
+        end
+    end
     return entry.name or (entry.link and entry.link:match("%[(.-)%]")) or ns.L.ITEM_FALLBACK
+end
+
+local function JournalInstance(run)
+    if not (run and run.mapID and C_EncounterJournal
+        and type(C_EncounterJournal.GetInstanceForGameMap) == "function") then return end
+    local ok, id = pcall(C_EncounterJournal.GetInstanceForGameMap, run.mapID)
+    id = ok and Public(id)
+    if type(id) == "number" and id > 0 then return id end
+end
+
+local function ObservedInstanceName(run)
+    local locale = Public(GetLocale())
+    local names = ns.db.lootInstanceNames
+    local byLocale = type(names) == "table" and names[locale]
+    local name = type(byLocale) == "table" and Public(byLocale[run.mapID])
+    if type(name) == "string" and name ~= "" then return name end
+end
+
+local function QuestInstanceName(run)
+    local id = instanceTitleQuests[run.mapID]
+    if not (id and C_QuestLog and type(C_QuestLog.GetTitleForQuestID) == "function") then return end
+    local name = Public(C_QuestLog.GetTitleForQuestID(id))
+    if type(name) == "string" and name ~= "" then return name end
+    if not requestedQuests[id] and type(C_QuestLog.RequestLoadQuestByID) == "function" then
+        requestedQuests[id] = true
+        C_QuestLog.RequestLoadQuestByID(id)
+    end
+end
+
+local function JournalSourceID(run, source)
+    local instance = JournalInstance(run)
+    if not instance or type(source) ~= "string" or type(EJ_GetEncounterInfoByIndex) ~= "function" then return end
+    local match
+    for index = 1, 100 do
+        local ok, name, _, id = pcall(EJ_GetEncounterInfoByIndex, index, instance)
+        name, id = Public(name), Public(id)
+        if not ok or not name then break end
+        if name == source and type(id) == "number" and id > 0 then
+            if match then return end
+            match = id
+        end
+    end
+    return match
+end
+
+function H:GetSourceName(entry)
+    if entry.sourceJournalID and type(EJ_GetEncounterInfo) == "function" then
+        local ok, name = pcall(EJ_GetEncounterInfo, entry.sourceJournalID)
+        name = ok and Public(name)
+        if type(name) == "string" and name ~= "" then return name end
+    end
+    if entry.source == "Разное" or entry.source == "Miscellaneous" then
+        local locale = GetLocale()
+        if locale == "ruRU" then return "Разное" end
+        if locale == "enUS" or locale == "enGB" then return "Miscellaneous" end
+    end
+    return entry.source
 end
 
 function H:GetActiveRun()
@@ -236,6 +308,13 @@ function H:ObserveInstance(forceNew, reload)
     if type(self.character) ~= "string" then self.character = nil; return end
 
     local name, kind, difficulty, mapID, outside = Instance()
+    local locale = Public(GetLocale())
+    if name and type(locale) == "string" and locale ~= "" then
+        local names = ns.db.lootInstanceNames
+        if type(names) ~= "table" then names = {}; ns.db.lootInstanceNames = names end
+        if type(names[locale]) ~= "table" then names[locale] = {} end
+        names[locale][mapID] = name
+    end
     local previousInside = self.insideRunID
     if not name then
         if forceNew then self:CloseRun("reset") end
@@ -300,6 +379,18 @@ function H:Init()
         end
     end
     self:TrimRuns()
+    ns:RegisterEvent("GET_ITEM_INFO_RECEIVED", function(_, id, success)
+        if requestedItems[id] == true and success and C_Timer and type(C_Timer.After) == "function" then
+            requestedItems[id] = "loaded"
+            C_Timer.After(0, function() self:UpdateView() end)
+        end
+    end)
+    ns:RegisterEvent("QUEST_DATA_LOAD_RESULT", function(_, id, success)
+        if requestedQuests[id] == true and success and C_Timer and type(C_Timer.After) == "function" then
+            requestedQuests[id] = "loaded"
+            C_Timer.After(0, function() self:UpdateView() end)
+        end
+    end)
     ns:RegisterEvent("PLAYER_ENTERING_WORLD", function(_, _, reload)
         self.lockPrompt = nil
         self:ObserveInstance(false, Public(reload) == true)
@@ -330,7 +421,8 @@ function H:Init()
         local format = INSTANCE_RESET_SUCCESS
         if run and type(format) == "string" then
             format = format:gsub("%%1%$s", "%%s")
-            if format:find("%s", 1, true) and message == format:format(run.name) then
+            local currentName = ObservedInstanceName(run) or run.name
+            if type(currentName) == "string" and format:find("%s", 1, true) and message == format:format(currentName) then
                 self:CloseRun("reset")
             end
         end
@@ -414,7 +506,12 @@ function H:Record(session)
     record.link = session.itemLink or record.link
     record.icon = session.itemTexture or record.icon
     record.quality = session.itemQuality or record.quality
-    record.source = session.historySource or record.source
+    if session.historySource and session.historySource ~= record.source then
+        record.source, record.sourceJournalID = session.historySource, nil
+    end
+    if record.source and not record.sourceJournalID then
+        record.sourceJournalID = JournalSourceID(self:GetRun(record.runID) or session.historyRun, record.source)
+    end
     if session.winner then
         local previous, winner = record.winner, session.winner
         if not ClassToken(winner.class) and previous and WinnerNameKey(winner.name) == WinnerNameKey(previous.name) then
@@ -492,7 +589,18 @@ local function MatchesPlayer(history, entry, query)
 end
 
 local function GetRunName(entry, run)
-    return run and run.name or (entry.outside and ns.L.HISTORY_OUTSIDE or ns.L.HISTORY_LEGACY)
+    if run then
+        local observed = ObservedInstanceName(run)
+        if observed then return observed end
+        local id = JournalInstance(run)
+        if id and type(EJ_GetInstanceInfo) == "function" then
+            local ok, name = pcall(EJ_GetInstanceInfo, id)
+            name = ok and Public(name)
+            if type(name) == "string" and name ~= "" then return name end
+        end
+        return QuestInstanceName(run) or run.name
+    end
+    return entry.outside and ns.L.HISTORY_OUTSIDE or ns.L.HISTORY_LEGACY
 end
 
 function H:FindPersonalLoot(text)

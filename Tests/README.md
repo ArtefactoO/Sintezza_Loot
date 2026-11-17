@@ -12,11 +12,17 @@ In the Codex bundled environment, use this Python executable if `python` resolve
 
 ```powershell
 $testPython = 'C:\Program Files\WindowsApps\OpenAI.CodexPrimaryRuntime.v26-1112-611-0_26.1112.611.0_x64__3k8sg7r9htsxt\dependencies\python\python.exe'
-$env:PYTHONPATH = 'D:\Games\WoW_addons\.loot-verification-20261117\python'
+$env:PYTHONPATH = 'D:\Games\WoW_addons\.execute-verification\.loot-verification-20261117\python'
 & $testPython Tests/run.py
 ```
 
-Expected result: eighteen PASS lines, exit code 0. Tests and local dependencies are excluded from installation and ZIP packaging. `Test/Simulator.lua` remains part of the addon.
+Expected result: PASS lines and exit code 0. Tests and local dependencies are excluded from installation and ZIP packaging. `Test/Simulator.lua` remains part of the addon. HistoryLocale.lua covers client-localized names, item and quest data loading, French reset messages, persisted locale-specific instance names, search, fallbacks and CSV round trips.
+
+For the Drowned City, map 2970 and quest 95775 correspond to the user's existing history and the matching quest title in available English and Russian data. The client supplies the quest title in its current locale. A quest title is a fallback, not proof of the exact instance name in every locale. Names observed directly from `GetInstanceInfo` take precedence and are the only localized names used to match reset messages. The availability and localization of quest data and the history header layout require in-game verification.
+
+## Tracker refresh coverage
+
+TrackerRefresh.lua loads the production roster and tracker modules with isolated Lua environments. It checks a single metadata read per unit, full-name aliases, missing and secret metadata, retained cached class/role, solo and raid membership, and self deduplication. The tracker cases check one evaluation per visible roll, selected-tab changes, single-item refresh, and hidden/dismissed paths.
 
 ## Coverage for 1.6.0
 

@@ -7,6 +7,7 @@ ns.Simulator = Simulator
 
 local simCounter = 0
 local activeTimers = {}
+local pendingWinPreview
 local MAX_GROUP_SIZE = 40
 
 local MOCK_ITEMS = {
@@ -96,6 +97,31 @@ local function ResolveMockItemInfo(mockItem, onResolved)
         texture = mockItem.texture,
         quality = mockItem.quality,
     }
+end
+
+function Simulator:PreviewWin()
+    local mode = ns.db.winNotification
+    if mode == "OFF" then return end
+
+    local function Show(name, link, texture, quality)
+        if pendingWinPreview ~= Show then return end
+        pendingWinPreview = nil
+        if ns.db.winNotification ~= mode then return end
+        ns.RollEffects:PreviewWin({
+            itemName = name,
+            itemLink = link,
+            itemTexture = texture or MOCK_ITEMS[1].texture,
+            itemQuality = quality or MOCK_ITEMS[1].quality,
+        })
+    end
+
+    pendingWinPreview = Show
+    local item = ResolveMockItemInfo(MOCK_ITEMS[1], Show)
+    if item.link or not ns:ShowsBlizzardWin() then
+        Show(item.name, item.link, item.texture, item.quality)
+    else
+        C_Timer.After(3, function() Show(item.name, nil, item.texture, item.quality) end)
+    end
 end
 
 local function SpawnSimulatedItemRoll(mockItem, baseDelay, groupSize, scenario)

@@ -464,6 +464,7 @@ end
 
 -- Returns sorted array of player entries and summary statistics, including provisional winner
 function DataTracker:EvaluateSession(session)
+    if ns.PerfBridge then ns.PerfBridge.Count("evaluate") end
     if not session then return nil end
 
     local sortedPlayers = {}

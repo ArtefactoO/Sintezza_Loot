@@ -85,7 +85,7 @@ end
 function SettingsModule:Init()
     local panel = CreateFrame("Frame", "Sintezza_LootSettingsPanel", UIParent, "BackdropTemplate")
     panel:Hide()
-    panel:SetSize(720, 344)
+    panel:SetSize(650, 544)
     panel:SetFrameStrata("DIALOG")
     panel:SetClampedToScreen(true)
     panel:EnableMouse(true)
@@ -93,27 +93,31 @@ function SettingsModule:Init()
 
     local header = W:WindowHeader(panel, {
         icon = ns.ICON,
-        title = L.ADDON_TITLE,
+        title = L.SETTINGS_TITLE,
         version = ns.VERSION,
     })
-    panel.header = header
     AttachDrag(panel, header)
-    panel.close = header.close
-    local backToHistory = Button(header, L.HISTORY_BACK, 104, function() self:ReturnToHistory(true) end)
-    backToHistory:SetPoint("RIGHT", header.close, "LEFT", -4, 0)
-    panel:HookScript("OnHide", function()
-        if self.fromHistory then self:ReturnToHistory() end
-    end)
 
-    local sidebar = CreateFrame("Frame", nil, panel, "BackdropTemplate")
-    sidebar:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 0, -1)
-    sidebar:SetPoint("BOTTOMLEFT", panel, "BOTTOMLEFT", 1, 1)
-    sidebar:SetWidth(172)
-    T:SidebarSurface(sidebar)
-
+    local keys = { "tracker", "test", "data", "window" }
+    local labels = { L.SETTINGS_TRACKER, L.SETTINGS_PREVIEW, L.DATA_TITLE, L.SETTINGS_WINDOW_HEADER }
+    local pages, selected, tabs = {}
     local scroll, body, bar = W:ScrollFrame(panel)
-    scroll:SetPoint("TOPLEFT", sidebar, "TOPRIGHT", 14, -14)
-    scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -24, 14)
+    local function SelectPage(key)
+        if key == selected or not pages[key] then return end
+        if selected then pages[selected]:Hide() end
+        selected = key
+        local page = pages[key]
+        page:Show()
+        body:SetHeight(page:GetHeight())
+        scroll:RefreshRange()
+        scroll:SetVerticalScroll(0)
+        tabs:Refresh()
+    end
+    tabs = W:Segmented(panel, labels, keys, function() return selected end, SelectPage, true)
+    tabs:SetPoint("TOPLEFT", header, "BOTTOMLEFT", 12, -4)
+    tabs:SetPoint("TOPRIGHT", header, "BOTTOMRIGHT", -12, -4)
+    scroll:SetPoint("TOPLEFT", tabs, "BOTTOMLEFT", 0, -8)
+    scroll:SetPoint("BOTTOMRIGHT", panel, "BOTTOMRIGHT", -24, 12)
     bar:SetPoint("TOPLEFT", scroll, "TOPRIGHT", 4, 0)
     bar:SetPoint("BOTTOMLEFT", scroll, "BOTTOMRIGHT", 4, 0)
     scroll:HookScript("OnSizeChanged", function(_, width)
@@ -122,35 +126,11 @@ function SettingsModule:Init()
     end)
     body:SetWidth(math.max(1, scroll:GetWidth()))
 
-    local pages, buttons = {}, {}
-    local selected
-    local function SelectPage(key)
-        if key == selected then return end
-        if selected then
-            pages[selected]:Hide()
-            buttons[selected]:SetSelected(false)
-        end
-        selected = key
-        local page = pages[key]
-        page:Show()
-        body:SetHeight(page:GetHeight())
-        scroll:RefreshRange()
-        scroll:SetVerticalScroll(0)
-        buttons[key]:SetSelected(true)
-    end
-
     local page, banded
-    local navY = -8
-    local function StartPage(key, title, heading)
-        local button = W:NavButton(sidebar, title, key, SelectPage)
-        button:SetPoint("TOPLEFT", sidebar, "TOPLEFT", 0, navY)
-        button:SetPoint("TOPRIGHT", sidebar, "TOPRIGHT", 0, navY)
-        navY = navY - button:GetHeight()
-        buttons[key] = button
-        local hasHeading = heading and heading ~= title
-        page = hasHeading and W:Section(body, heading, nil, "settings") or CreateFrame("Frame", nil, body)
-        page.settingsTop = hasHeading and -(page.headerHeight + 4) or 0
-        page.settingsInset = hasHeading and W.CONTROL_INSET or 0
+    local function StartPage(key, heading)
+        page = heading and W:Section(body, heading, nil, "settings") or CreateFrame("Frame", nil, body)
+        page.settingsTop = heading and -(page.headerHeight + 4) or 0
+        page.settingsInset = heading and W.CONTROL_INSET or 0
         page:SetPoint("TOPLEFT")
         page:SetPoint("TOPRIGHT")
         page:Hide()
@@ -164,7 +144,9 @@ function SettingsModule:Init()
             if row:IsShown() then
                 row:ClearAllPoints()
                 row:SetPoint("TOPLEFT", card, "TOPLEFT", inset, y)
-                row:SetPoint("TOPRIGHT", card, "TOPRIGHT", -inset, y)
+                if not row.settingsCompact then
+                    row:SetPoint("TOPRIGHT", card, "TOPRIGHT", -inset, y)
+                end
                 y = y - row:GetHeight() - row.settingsGap
             end
         end
@@ -175,12 +157,13 @@ function SettingsModule:Init()
         end
     end
 
-    local function Place(row, gap, setting)
+    local function Place(row, gap, setting, compact)
         if setting then
             if not banded then T:RowBand(row) end
             banded = not banded
         end
         row.settingsGap = gap or 2
+        row.settingsCompact = compact
         page.rows[#page.rows + 1] = row
         Relayout(page)
         return row
@@ -197,22 +180,8 @@ function SettingsModule:Init()
         return Label(text, T.text, 28)
     end
 
-    local function Disclosure(title, build, refresh)
-        local card, first = page, #page.rows + 2
-        local expanded
-        local action
-        action = W:ActionRow(card, title, L.SETTINGS_SHOW, function()
-            expanded = not expanded
-            for index = first, action.lastRow do card.rows[index]:SetShown(expanded) end
-            action.button:SetText(expanded and L.SETTINGS_HIDE or L.SETTINGS_SHOW)
-            if refresh and expanded then refresh() end
-            Relayout(card)
-        end)
-        Place(action, 4)
-        build()
-        action.lastRow = #card.rows
-        for index = first, action.lastRow do card.rows[index]:Hide() end
-        Relayout(card)
+    local function Action(text, width, click, gap)
+        return Place(Button(page, text, width, click), gap or 4, false, true)
     end
 
     local function RefreshTracker() ns.RollTrackerFrame:Refresh() end
@@ -244,11 +213,10 @@ function SettingsModule:Init()
     end
     local function Choice(...)
         local row = BuildChoice(page, ...)
-        row.button:SetWidth(245)
         Place(row, nil, true)
         return row
     end
-StartPage("tracker", L.SETTINGS_TRACKER, L.SETTINGS_TRACKER_BEHAVIOR)
+    StartPage("tracker", L.SETTINGS_TRACKER_BEHAVIOR)
     local trackerPage = page
     local recordingNotice
     local function RefreshTrackerOptions()
@@ -277,46 +245,50 @@ StartPage("tracker", L.SETTINGS_TRACKER, L.SETTINGS_TRACKER_BEHAVIOR)
         end, L.SETTINGS_SECONDS), nil, true)
     delay:SetShown(ns.db.autoCloseEnabled)
     Relayout(page)
-    Toggle(L.SETTINGS_NORMAL_TIMER, nil, "showRollTimer", RefreshTracker)
+    Toggle(L.SETTINGS_NORMAL_TIMER, nil, "showRollTimer", RefreshTracker).settingsGap = 8
 
-    Heading(L.SETTINGS_WIN_HEADING)
-    Choice(L.SETTINGS_WIN_LABEL, nil, "winNotification", {
+    local winPreview
+    Choice(L.SETTINGS_WIN_HEADING, nil, "winNotification", {
         SINTEZZA = "Sintezza", BLIZZARD = "Blizzard", BOTH = L.SETTINGS_WIN_BOTH, OFF = L.SETTINGS_WIN_OFF,
-    }, { "SINTEZZA", "BLIZZARD", "BOTH", "OFF" }, function() ns:ApplyBlizzardWinToastSetting() end)
-
-    Disclosure(L.SETTINGS_PARTICIPANTS, function()
-        Choice(L.SETTINGS_CHOICE_DISPLAY, nil, "choiceDisplay", {
-            ICONS = L.SETTINGS_CHOICE_ICONS, TEXT = L.SETTINGS_CHOICE_TEXT, BOTH = L.SETTINGS_CHOICE_BOTH,
-        }, { "BOTH", "ICONS", "TEXT" }, RefreshTracker)
-        Toggle(L.SETTINGS_SHOW_PASS, nil, "hidePassed", function(value)
-            ns.db.hidePassed = not value
-            RefreshTracker()
-        end, function() return not ns.db.hidePassed end)
-        Toggle(L.SETTINGS_SHOW_PENDING, nil, "hidePending", function(value)
-            ns.db.hidePending = not value
-            RefreshTracker()
-        end, function() return not ns.db.hidePending end)
-        Toggle(L.SETTINGS_SHOW_ROLE, nil, "showRoleIcons", RefreshTracker)
+    }, { "SINTEZZA", "BLIZZARD", "BOTH", "OFF" }, function()
+        ns:ApplyBlizzardWinToastSetting()
+        winPreview:SetEnabled(ns.db.winNotification ~= "OFF")
     end)
+    winPreview = Action(L.SETTINGS_PREVIEW_WIN, 144, function() ns.Simulator:PreviewWin() end, 8)
+    winPreview:SetEnabled(ns.db.winNotification ~= "OFF")
 
-    local conflict
-    Disclosure(L.SETTINGS_CONFLICTS, function()
-        conflict = Label("", T.muted, 50)
-        conflict:SetWordWrap(true)
-    end, function()
+    Heading(L.SETTINGS_PARTICIPANTS)
+    Choice(L.SETTINGS_CHOICE_DISPLAY, nil, "choiceDisplay", {
+        ICONS = L.SETTINGS_CHOICE_ICONS, TEXT = L.SETTINGS_CHOICE_TEXT, BOTH = L.SETTINGS_CHOICE_BOTH,
+    }, { "BOTH", "ICONS", "TEXT" }, RefreshTracker)
+    Toggle(L.SETTINGS_SHOW_PASS, nil, "hidePassed", function(value)
+        ns.db.hidePassed = not value
+        RefreshTracker()
+    end, function() return not ns.db.hidePassed end)
+    Toggle(L.SETTINGS_SHOW_PENDING, nil, "hidePending", function(value)
+        ns.db.hidePending = not value
+        RefreshTracker()
+    end, function() return not ns.db.hidePending end)
+    Toggle(L.SETTINGS_SHOW_ROLE, nil, "showRoleIcons", RefreshTracker)
+
+    Heading(L.SETTINGS_CONFLICTS)
+    local conflict = Label("", T.muted, 36)
+    conflict:SetWordWrap(true)
+    local function RefreshConflict()
         local competitor = ns:GetCompetingTracker()
         conflict:SetText(competitor and L.SETTINGS_CONFLICT_LOADED:format(competitor) or L.SETTINGS_CONFLICT_NONE)
         Sintezza_Theme:Tint(conflict, "SetTextColor", competitor and T.warning or T.muted)
-    end)
+    end
+    trackerPage:HookScript("OnShow", RefreshConflict)
 
-    StartPage("test", L.SETTINGS_PREVIEW, L.SETTINGS_TEST_HEADER)
+    StartPage("test", L.SETTINGS_TEST_HEADER)
     Choice(L.TEST_ITEMS, nil, "testItemCount", { [1] = "1", [2] = "2", [4] = "4" }, { 1, 2, 4 })
     Choice(L.TEST_PLAYERS, nil, "testGroupSize", { [5] = "5", [10] = "10", [20] = "20", [40] = "40" },
         { 5, 10, 20, 40 })
     Choice(L.TEST_ROLL_FLOW, L.TEST_ROLL_FLOW_HELP, "testScenario", {
         TIMEOUT = L.TEST_TIMEOUT, SELF = L.TEST_SELF_WIN, OTHER = L.TEST_OTHER_WIN, PASS = L.TEST_ALL_PASS,
     }, { "SELF", "TIMEOUT", "OTHER", "PASS" })
-    self.testButton = Place(Button(page, L.TEST_START, 185, function()
+    self.testButton = Action(L.TEST_START, 144, function()
         if self.testRunning then
             ns.Simulator:StopTests()
         else
@@ -324,9 +296,9 @@ StartPage("tracker", L.SETTINGS_TRACKER, L.SETTINGS_TRACKER_BEHAVIOR)
                 ns.db.testItemCount, ns.db.testGroupSize, ns.db.testScenario)
             if not ok then ns:Print(L.SIMULATION_ERROR .. " · " .. tostring(err)) end
         end
-    end), 4)
+    end)
 
-    StartPage("data", L.DATA_TITLE, L.HISTORY_TITLE)
+    StartPage("data", L.HISTORY_TITLE)
     local dataPage = page
     local stats = {}
     for index, label in ipairs({ L.HISTORY_RUNS, L.DATA_ROLLS, L.HISTORY_PERSONAL }) do
@@ -339,14 +311,17 @@ StartPage("tracker", L.SETTINGS_TRACKER, L.SETTINGS_TRACKER_BEHAVIOR)
         end
     end
     dataPage:HookScript("OnShow", self.RefreshData)
-    Place(Button(page, L.DATA_TRANSFER, 210, function()
+    Action(L.DATA_TRANSFER, 166, function()
         Sintezza_Theme.DataTransfer:Open(panel, ns.DataTransferSpec)
-    end))
-    Place(Button(page, L.DATA_MAINTENANCE, 210, function()
+    end)
+    Action(L.DATA_MAINTENANCE, 166, function()
         Sintezza_Theme.DataTransfer:OpenMaintenance(panel, ns.DataTransferSpec)
-    end))
+    end)
 
-    StartPage("window", L.SETTINGS_WINDOW_HEADER)
+    StartPage("window")
+    if ns.IsForever then
+        Toggle(L.SETTINGS_SKIN_GROUP_LOOT, L.SETTINGS_SKIN_GROUP_LOOT_HELP, "skinGroupLoot")
+    end
     Place(Sintezza_Theme:CreateWindowOptions(page, T, {
         windows = {
             { label = L.SETTINGS_HISTORY_WINDOWS, prefs = ns.WindowAppearance },
@@ -361,19 +336,18 @@ StartPage("tracker", L.SETTINGS_TRACKER, L.SETTINGS_TRACKER_BEHAVIOR)
     self.anchorRow = Choice(L.SETTINGS_ANCHOR_SIDE, nil, "anchorSide", {
         RIGHT = L.SETTINGS_ANCHOR_RIGHT, LEFT = L.SETTINGS_ANCHOR_LEFT, FREE = L.SETTINGS_ANCHOR_FREE,
     }, { "RIGHT", "LEFT", "FREE" }, function() ns.MultiItemManager:UpdateAnchoring() end)
-    Place(Button(page, L.SETTINGS_MOVE_BTN, 178, function() ns.RollTrackerFrame:ToggleMoveMode() end))
+    Action(L.SETTINGS_MOVE_BTN, 158, function() ns.RollTrackerFrame:ToggleMoveMode() end)
 
     SelectPage("tracker")
     ApplyPosition(panel)
     table.insert(UISpecialFrames, panel:GetName())
     self.panel = panel
-    self.SelectPage = SelectPage
     ns.WindowAppearance:Bind(panel, {
         layout = function()
             ApplyPosition(panel)
             ns.MultiItemManager:UpdateAnchoring()
         end,
-        resize = { minWidth = 720, minHeight = 314, maxWidth = 1300, maxHeight = 850 },
+        resize = { minWidth = 625, minHeight = 460, maxWidth = 1300, maxHeight = 850 },
     })
     ns.Launcher:RegisterSettings(L.ADDON_TITLE, function() self:OpenSettings() end)
 end
@@ -401,31 +375,6 @@ function SettingsModule:OpenSettings()
     self:OnRollPositionChanged()
     panel:Show()
     panel:Raise()
-end
-
-function SettingsModule:OpenDataFromHistory()
-    if not self.panel then return end
-    self:OpenFromHistory()
-    self.SelectPage("data")
-end
-
-function SettingsModule:OpenFromHistory()
-    if not self.panel then return end
-    self.fromHistory = true
-    ns.History.frame:Hide()
-    self:OpenSettings()
-end
-
-function SettingsModule:ReturnToHistory(force)
-    if not self.panel or (not force and not self.fromHistory) then return false end
-    self.fromHistory = nil
-    self.panel:Hide()
-    ns.History:Open()
-    return true
-end
-
-function SettingsModule:Hide()
-    if self.panel then self.panel:Hide() end
 end
 
 function SettingsModule:ToggleSettings()

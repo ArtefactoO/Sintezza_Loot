@@ -20,3 +20,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Third-party code credits
+
+Clear Loot 0.1.6 by xray33 (imxray33 on CurseForge), distributed under the MIT License.
+Adapted portions remain in DataTracker.lua, RosterInspector.lua, Core.lua,
+UI/RollTrackerFrame.lua, UI/MultiItemManager.lua, and Test/Simulator.lua.
+Source: https://github.com/xray33/clearloot

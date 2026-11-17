@@ -189,9 +189,8 @@ local function CreateItemTab(parent, index)
     local icon = tab:CreateTexture(nil, "ARTWORK")
     icon:SetPoint("TOPLEFT", 3, -3)
     icon:SetPoint("BOTTOMRIGHT", -3, 3)
-    icon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     tab.icon = icon
-    tab.iconBorder = T:FrameIcon(tab, icon)
+    tab.iconBorder = ns:FrameItemIcon(tab, icon)
 
     local badge = tab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     badge:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -441,9 +440,8 @@ function RollTrackerFrame:Init()
     local itemIcon = itemHeader:CreateTexture(nil, "ARTWORK")
     itemIcon:SetSize(20, 20)
     itemIcon:SetPoint("LEFT", itemHeader, "LEFT", 0, 0)
-    itemIcon:SetTexCoord(0.08, 0.92, 0.08, 0.92)
     frame.itemIcon = itemIcon
-    frame.itemBorder = T:FrameIcon(itemHeader, itemIcon)
+    frame.itemBorder = ns:FrameItemIcon(itemHeader, itemIcon)
 
     local itemTitle = itemHeader:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     itemTitle:SetPoint("LEFT", itemIcon, "RIGHT", 6, 0)
@@ -722,6 +720,7 @@ function RollTrackerFrame:UpdateTabs(activeRolls, currentRollID)
     if not frame then return end
 
     local showTabs = (#activeRolls > 1)
+    local currentEvaluation
     for i = 1, MAX_TABS do
         local tab = frame.tabs[i]
         local rollSession = showTabs and activeRolls[i] or nil
@@ -731,9 +730,10 @@ function RollTrackerFrame:UpdateTabs(activeRolls, currentRollID)
             tab.itemName = rollSession.itemName
             tab.icon:SetTexture(rollSession.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
             local r, g, b = ns.GetItemQualityColor(rollSession.itemQuality)
-            T:PaintItemBorder(tab.iconBorder, rollSession.itemQuality, r, g, b)
+            tab.iconBorder:SetBackdropBorderColor(r, g, b, .9)
 
             local eval = DataTracker:EvaluateSession(rollSession)
+            if rollSession.rollID == currentRollID then currentEvaluation = eval end
             if eval then
                 tab.badge:SetText(string.format("%d/%d", eval.answeredPlayers, eval.totalPlayers))
             else
@@ -750,6 +750,7 @@ function RollTrackerFrame:UpdateTabs(activeRolls, currentRollID)
             tab:Hide()
         end
     end
+    return currentEvaluation
 end
 
 function RollTrackerFrame:UpdatePlayerRows()
@@ -1050,13 +1051,13 @@ function RollTrackerFrame:Refresh(forceShow)
 
     frame:Show()
     local activeRolls = DataTracker:GetActiveRolls()
-    self:UpdateTabs(activeRolls, session.rollID)
+    local tabEvaluation = self:UpdateTabs(activeRolls, session.rollID)
     if #activeRolls <= 1 then ns.RollEffects:NewItem(session, frame, false) end
 
     -- Item Header (use plain itemName colored by quality, without hyperlink [brackets])
     frame.itemIcon:SetTexture(session.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
     local r, g, b = ns.GetItemQualityColor(session.itemQuality or 2)
-    T:PaintItemBorder(frame.itemBorder, session.itemQuality, r, g, b)
+    frame.itemBorder:SetBackdropBorderColor(r, g, b, .9)
     local cleanName = session.itemName
     if (not cleanName or cleanName == "") and session.itemLink then
         cleanName = session.itemLink:match("%[(.-)%]") or session.itemLink
@@ -1065,7 +1066,7 @@ function RollTrackerFrame:Refresh(forceShow)
     frame.itemTitle:SetTextColor(r or 1, g or 1, b or 1)
 
     -- Evaluate Player List & Leaders
-    self.currentEval = DataTracker:EvaluateSession(session)
+    self.currentEval = tabEvaluation or DataTracker:EvaluateSession(session)
     frame.footerSession = session
     self:UpdateFooter()
 

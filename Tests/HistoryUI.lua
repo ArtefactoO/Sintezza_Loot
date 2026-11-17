@@ -17,6 +17,7 @@ function methods:SetText(value) self.textValue = value end
 function methods:GetText() return self.textValue or "" end
 function methods:CreateTexture() return widget("Texture") end
 function methods:SetTexture(value) self.texture = value end
+function methods:SetTexCoord(...) self.crop = { ... } end
 function methods:SetAtlas(value) self.texture = value end
 function methods:SetBackdropColor(...) self.fill = { ... } end
 function methods:SetBackdropBorderColor(...) self.outline = { ... } end
@@ -34,9 +35,9 @@ local sharedCalls = { band = 0, hover = 0, arrow = 0 }
 function T:RowBand() sharedCalls.band = sharedCalls.band + 1; return widget("Band") end
 function T:MenuHighlight() sharedCalls.hover = sharedCalls.hover + 1; local w = widget("Hover"); w:Hide(); return w end
 function T:DisclosureArrow() sharedCalls.arrow = sharedCalls.arrow + 1; return widget("Arrow") end
-function T:FrameIcon() return widget("IconBorder") end
-T.Backdrop, T.PaintItemBorder = noop, noop
+T.Backdrop = noop
 ns.Theme = T
+function Sintezza_Theme:ForAddon() return T end
 function Sintezza_Theme:Tint(target, method, color, alpha)
     target[method](target, color[1], color[2], color[3], alpha or color[4] or 1)
 end
@@ -53,6 +54,7 @@ ns.DataTracker.ROLL_ICONS = { [1] = "need", [2] = "greed" }
 ns.DataTracker.GetRollTypeLabel = function() return "Need" end
 ns.RosterInspector.ColorizeName = function(_, name) return name end
 ns.RosterInspector.GetClassColorHex = function() return "ffffffff" end
+assert(loadfile(ADDON_ROOT .. "/Theme.lua"))("Sintezza_Loot", ns)
 assert(loadfile(ADDON_ROOT .. "/UI/History.lua"))("Sintezza_Loot", ns)
 H.tab, H.itemRows, H.playerRows, H.runRows = "runs", {}, {}, {}
 for _, key in ipairs({ "frame", "search", "heading", "meta", "empty", "playerDetails", "playerHeader", "noPlayers",
@@ -73,6 +75,7 @@ H:Record(second)
 H:Refresh()
 assert(#H.itemRows == 2 and sharedCalls.arrow == 2 and sharedCalls.band == 2 and sharedCalls.hover == 2)
 local row = H.itemRows[1]
+assert(row.icon.crop[1] == .10 and row.border.outline[2] == 1 and row.border.outline[4] == .9)
 assert(not row.disclosure and not row.chevron.expanded)
 row.scripts.OnEnter(row); assert(row.hover.shown)
 row.scripts.OnLeave(row); assert(not row.hover.shown)

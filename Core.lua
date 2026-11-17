@@ -6,7 +6,7 @@ ns.ICON = Sintezza_Theme.icons.Sintezza_Loot
 local rawVersion = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
     or (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version"))
 if not rawVersion or rawVersion:find("project%-version") then
-    rawVersion = "1.5.0"
+    rawVersion = "1.6.0"
 end
 ns.VERSION = rawVersion
 ns.DEFAULT_AUTO_CLOSE_DELAY = 10
@@ -16,6 +16,7 @@ local DEFAULT_SETTINGS = {
     autoOpen = true,
     showRoleIcons = true,
     showRollTimer = true,
+    skinGroupLoot = false,
     autoSwitchOnHover = true,
     keepOpenAfterMyRoll = true,
     hidePassed = false,
@@ -52,6 +53,10 @@ function ns:ShowsSintezzaWin()
     return winNotifications[self.db.winNotification].sintezza
 end
 
+function ns:ShowsBlizzardWin()
+    return winNotifications[self.db.winNotification].blizzard
+end
+
 function ns:GetAutoCloseDelay()
     if self.db.autoCloseEnabled then return self.db.autoCloseDelay end
 end
@@ -62,7 +67,7 @@ function ns:ApplyBlizzardWinToastSetting()
     local alert = AlertFrame
     if not alert or alert:IsForbidden() then return end
 
-    if not winNotifications[self.db.winNotification].blizzard then
+    if not self:ShowsBlizzardWin() then
         if alert:IsEventRegistered(rollWonEvent) then
             alert:UnregisterEvent(rollWonEvent)
             suppressedRollAlert = alert
@@ -135,6 +140,11 @@ end
 function ns:InitDB()
     if type(Sintezza_LootDB) ~= "table" then
         Sintezza_LootDB = {}
+    end
+    -- Older builds saved the enabled default even if the checkbox was never used.
+    if not Sintezza_LootDB.groupLootSkinOptInMigrated then
+        if Sintezza_LootDB.skinGroupLoot == true then Sintezza_LootDB.skinGroupLoot = false end
+        Sintezza_LootDB.groupLootSkinOptInMigrated = true
     end
     for k, v in pairs(DEFAULT_SETTINGS) do
         if Sintezza_LootDB[k] == nil then
@@ -301,6 +311,7 @@ ns:RegisterEvent("ADDON_LOADED", function(_, loadedName)
         { name = "DataTracker",     mod = ns.DataTracker },
         { name = "RollTrackerFrame",mod = ns.RollTrackerFrame },
         { name = "MultiItemManager",mod = ns.MultiItemManager },
+        { name = "RollEffects",    mod = ns.RollEffects },
         { name = "Settings",        mod = ns.Settings },
     }
 

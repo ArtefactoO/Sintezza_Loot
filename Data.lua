@@ -97,7 +97,7 @@ end
 local rollFields = {
     time = Stamp, character = Character, outside = Boolean, name = Name, link = Item, icon = Texture,
     quality = function(value) return Integer(value, 0, 10) end,
-    source = Name, winner = Winner, allPassed = Boolean, choice = Choice, score = Score, players = Players,
+    source = Name, sourceJournalID = Positive, winner = Winner, allPassed = Boolean, choice = Choice, score = Score, players = Players,
     attemptItemID = Positive,
     dropSignature = function(value)
         return type(value) == "string" and #value <= 1200 and not value:find("[%z\001-\031\127]")

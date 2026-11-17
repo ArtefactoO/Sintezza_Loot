@@ -4,10 +4,11 @@
 ## Notes-ruRU: Отслеживание выбора и бросков на добычу в группе и рейде.
 ## Author: Sintezza
 ## X-License: MIT
-## Version: 1.5.0
+## Version: 1.6.0
 ## IconTexture: Interface\AddOns\Sintezza_Theme\Media\Icons\Sintezza_Loot
 ## SavedVariables: Sintezza_LootDB
 ## Dependencies: Sintezza_Theme
+## OptionalDeps: Sintezza_Perf
 
 
 Locales.lua
@@ -25,3 +26,4 @@ UI\RollTrackerFrame.lua
 UI\MultiItemManager.lua
 Config\Settings.lua
 Test\Simulator.lua
+PerfBridge.lua

@@ -109,6 +109,7 @@ local function CacheUnit(unit)
     if firstOnly then
         playerCache[firstOnly] = entry
     end
+    return displayName, fullName, firstOnly, classFile, role
 end
 
 function RosterInspector:FindUnitByName(name)
@@ -189,18 +190,13 @@ function RosterInspector:GetPlayerInfo(name, fallbackClass, fallbackRole)
 end
 
 function RosterInspector:GetEligibleGroupMembers()
-    self:ScanGroup()
     local members = {}
     local seen = {}
 
     local function AddUnit(unit)
-        local displayName, fullName, firstOnly = self:GetUnitNames(unit)
+        local displayName, fullName, firstOnly, classFile, role = CacheUnit(unit)
         if displayName and not seen[displayName] then
             seen[displayName] = true
-            local _, classFile = UnitClass(unit)
-            if ns.IsSecretValue(classFile) then classFile = nil end
-            local role = UnitGroupRolesAssigned and UnitGroupRolesAssigned(unit) or "NONE"
-            if ns.IsSecretValue(role) then role = "NONE" end
             table.insert(members, {
                 name = displayName,
                 fullName = fullName or displayName,

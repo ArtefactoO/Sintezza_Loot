@@ -1,6 +1,6 @@
 # Sintezza Loot
 
-![Sintezza Loot project logo](Docs/Logo.png)
+![Sintezza Loot project logo](Docs/CurseForge/Logo.png)
 
 Sintezza Loot tracks group and raid loot in World of Warcraft Forever 1.60.1. See each player's choice, roll, and the confirmed winner. Search the archive by instance, item, or player, and find your own wins under **My loot**.
 
@@ -8,7 +8,8 @@ Install and enable **[Sintezza Theme](https://github.com/ArtefactoO/Sintezza_The
 
 ## Tracker and archive
 
-- **Tracker.** Show the remaining roll time, participant choices, and roll results. Choose the Sintezza or Blizzard win banner, both, or neither. History continues recording while the tracker window is disabled.
+- **Tracker.** Show the remaining roll time, participant choices, and roll results. Choose the Sintezza or Blizzard win banner, both, or neither. **Preview** shows the selected notifications with a sample item. History continues recording while the tracker window is disabled.
+- **Blizzard roll popup.** Enable **Style the Blizzard loot roll** under **Window and minimap** and reload to try the Sintezza surface, fonts, and countdown colors. The skin is off by default. Blizzard colors the item name and icon border by quality and handles the roll buttons. If EllesmereUI's **Loot Roll Popups** skin is active, that skin takes priority.
 - **Runs.** Inspect current and archived runs. Winners are colored by class when the class is confirmed. Earlier records without run information appear under Unknown run.
 - **My loot.** See your won items from group rolls. For items tracked since version 1.3.0, the series counter shows which recorded roll won the item. A series restarts after a win and survives pruning of its earlier entries.
 - **Data management.** Review run, roll, and win counts. Copy all data or a selected section as CSV. Import previews changes and skips duplicates. Memory measurement and confirmed clearing are available under Maintenance.
@@ -35,33 +36,44 @@ Click a loot row to expand its participants. A small shared Theme arrow shows wh
 
 The settings preview also offers group size, item count, and roll timing. Simulations display in the regular tracker and are excluded from stored history.
 
+Open **Settings** from the history header to show a separate window. Use its **Data** tab to manage loot history.
+
 ## Gallery
 
-![Items and winners in the dungeon loot history.](Docs/01-run-history.png)
+![Simulated roll for Cruel Barb](Docs/CurseForge/01-roll-tracker.png)
 
-![The My Loot tab with an expanded roll and its winner.](Docs/02-my-loot.png)
+Simulated group roll. The tracker shows responses, roll values, and time left.
 
-![Responses and winner in the simulated group roll.](Docs/03-test-roll.gif)
+![Loot archive for a Drowned City run](Docs/CurseForge/02-run-history.png)
+
+The run archive lists dropped items and their winners for each instance visit.
+
+![Expanded roll for Knucklebone Ring](Docs/CurseForge/03-expanded-roll.png)
+
+Expand a loot row to see each player’s choice and roll, with the confirmed winner marked.
+
+![Outside runs archive](Docs/CurseForge/04-outside-runs.png)
+
+Outside runs keeps group rolls that happened away from an instance.
+
+![My loot with Deep Flora Bindings expanded](Docs/CurseForge/05-my-loot.png)
+
+My loot lists your wins and shows how many recorded rolls it took to win each item.
+
+![Tracker behavior and notification settings](Docs/CurseForge/06-tracker-settings.png)
+
+Choose when the tracker opens and closes, what it displays, and which win notification appears.
+
+![Data tab with report counts and CSV controls](Docs/CurseForge/07-data-settings.png)
+
+The Data tab shows archive counts and opens CSV import, export, and maintenance.
+
+![Window and minimap controls and Blizzard roll skin option](Docs/CurseForge/08-window-and-minimap.png)
+
+Set window scale and opacity, position the tracker, or enable the optional Blizzard loot roll skin.
 
 ## License and credits
 
-Sintezza Loot is distributed under the MIT license. The roll tracker and parts of its UI incorporate adaptations of Clear Loot 0.1.6 by xray33 (imxray33 on CurseForge). The run archive, My loot, and rolls-to-win counter are Sintezza features. [MIT license](LICENSE) · [Clear Loot](https://www.curseforge.com/wow/addons/clearloot) · [Changelog](CHANGELOG.md)
-
-## На русском
-
-Sintezza Loot показывает выбор участников, броски и победителя группового розыгрыша в WoW Forever 1.60.1. Установи и включи **Sintezza Theme**. Язык выбирается в `/stheme` и применяется после перезагрузки интерфейса. Если включен Clear Loot, Sintezza Loot один раз предупредит о конфликте и продолжит запись.
-
-- **Трекер** показывает время розыгрыша и участников. Можно выбрать плашку победы Sintezza, Blizzard, обе или выключить обе. История записывается и со скрытым трекером.
-- **История** группирует розыгрыши по заходам и сохраняет только забеги с роллами. Возврат после вайпа продолжает незавершенный забег без ограничения по времени. Подтвержденный сброс, смена инстанса или сложности, выход из группы и новое испытание разделяют забеги. Нажатие на строку предмета раскрывает участников; свой персонаж отмечен тонкой рамкой. Поиск работает по инстансу, предмету и нику. При подтвержденном классе имя победителя окрашивается в его цвет.
-- **Моя добыча** показывает выигранные предметы текущего персонажа. Для записей с версии 1.3.0 указано, на какой попытке в серии удалось выиграть предмет. После победы начинается новая серия.
-- **Управление данными** показывает счетчики заходов, розыгрышей и побед. CSV поддерживает предварительную проверку импорта и пропуск дубликатов. В «Обслуживании» доступны замер памяти и очистка с подтверждением.
-
-`/sloot` открывает настройки, `/sloot history` — историю, `/sloot move` — режим перемещения трекера. Команды `/sloot test`, `/sloot testmulti` и `/sloot testraid` запускают предпросмотр, `/sloot stop` его завершает. Тесты исключаются из истории.
-
-После подтвержденного завершения добыча с треша записывается в прежний забег до выхода. Повторный вход начинает новый; `/reload` внутри сохраняет прежний. Уже начатые роллы остаются в своем забеге, даже если результат пришел после выхода. Завершение определяется отдельным событием, достоверным снимком привязки со всеми убитыми боссами или убийством всех боссов из доступного списка журнала. Последний элемент списка сам по себе не подтверждает завершение.
-
-Аддон также использует изменение ID сохранения и полный снимок окна привязки, в котором ранее убитый босс снова жив. При запоздавшем ответе в новый забег переходят только роллы и убийства боссов текущего входа. Пустые, секретные и противоречивые ответы игнорируются; одинаковый прогресс не доказывает, что копия осталась прежней. Если данных недостаточно, `/sloot newrun` перед следующим роллом начнет отдельный забег в истории. Команда не сбрасывает инстанс и не переносит прежние записи. По времени отсутствия и GUID цели сброс не определяется.
-
-В трекере использованы адаптации кода Clear Loot. [Лицензия MIT](LICENSE) · [История изменений](CHANGELOG.md)
+Inspired by [Clear Loot](https://www.curseforge.com/wow/addons/clearloot) by xray33. [MIT License and code credits](LICENSE) · [Changelog](CHANGELOG.md)
 
 [CurseForge listing fields](CURSEFORGE.md)

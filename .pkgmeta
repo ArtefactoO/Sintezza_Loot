@@ -1,5 +1,6 @@
 package-as: Sintezza_Loot
 ignore:
+  - Docs/CurseForge
   - Tests
 manual-changelog:
   filename: CHANGELOG.md
