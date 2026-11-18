@@ -184,13 +184,24 @@ local function CreateItemTab(parent, index)
     local tab = CreateFrame("Button", "Sintezza_LootItemTab" .. index, parent, BackdropTemplateMixin and "BackdropTemplate" or nil)
     tab:SetSize(30, 30)
 
-    T:SkinTab(tab)
+    T:Backdrop(tab, T.input, { 0, 0, 0, 0 })
 
     local icon = tab:CreateTexture(nil, "ARTWORK")
-    icon:SetPoint("TOPLEFT", 3, -3)
-    icon:SetPoint("BOTTOMRIGHT", -3, 3)
+    icon:SetPoint("TOPLEFT", 1, -1)
+    icon:SetPoint("BOTTOMRIGHT", -1, 1)
+    icon:SetTexCoord(.10, .90, .10, .90)
     tab.icon = icon
-    tab.iconBorder = ns:FrameItemIcon(tab, icon)
+
+    local highlight = tab:CreateTexture(nil, "HIGHLIGHT")
+    highlight:SetAllPoints(icon)
+    Sintezza_Theme:Tint(highlight, "SetColorTexture", T.accent, .12)
+
+    local selected = tab:CreateTexture(nil, "OVERLAY")
+    selected:SetPoint("TOPLEFT", tab, "BOTTOMLEFT", 2, -1)
+    selected:SetPoint("TOPRIGHT", tab, "BOTTOMRIGHT", -2, -1)
+    selected:SetHeight(1)
+    Sintezza_Theme:Tint(selected, "SetColorTexture", T.accent)
+    tab.selected = selected
 
     local badge = tab:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     badge:SetPoint("BOTTOMRIGHT", -2, 2)
@@ -401,7 +412,7 @@ function RollTrackerFrame:Init()
     for i = 1, MAX_TABS do
         local tab = CreateItemTab(frame, i)
         if i == 1 then
-            tab:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 6, -2)
+            tab:SetPoint("BOTTOMLEFT", frame, "TOPLEFT", 6, 4)
         else
             tab:SetPoint("LEFT", frame.tabs[i - 1], "RIGHT", 4, 0)
         end
@@ -730,7 +741,7 @@ function RollTrackerFrame:UpdateTabs(activeRolls, currentRollID)
             tab.itemName = rollSession.itemName
             tab.icon:SetTexture(rollSession.itemTexture or "Interface\\Icons\\INV_Misc_QuestionMark")
             local r, g, b = ns.GetItemQualityColor(rollSession.itemQuality)
-            tab.iconBorder:SetBackdropBorderColor(r, g, b, .9)
+            tab:SetBackdropBorderColor(r, g, b, .9)
 
             local eval = DataTracker:EvaluateSession(rollSession)
             if rollSession.rollID == currentRollID then currentEvaluation = eval end
@@ -741,8 +752,7 @@ function RollTrackerFrame:UpdateTabs(activeRolls, currentRollID)
             end
 
             local active = rollSession.rollID == currentRollID
-            T:PaintButton(tab, active)
-            tab.icon:SetDesaturated(false)
+            tab.selected:SetShown(active)
             tab.icon:SetAlpha(active and 1 or .65)
             tab:Show()
             ns.RollEffects:NewItem(rollSession, tab, true)

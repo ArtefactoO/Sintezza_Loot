@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.6.1
+
+- Give the optional Sintezza skin priority over EllesmereUI for Blizzard's group roll popup after a UI reload, without changing the saved EllesmereUI style.
+- Use Sintezza Theme's shared background, fonts, item outline, smaller roll symbols, and countdown bar in the group roll popup. The skin requires Sintezza Theme 1.5.1 or later.
+- Keep expired or undated loot-history entries out of the tracker, remember dismissed history rolls across UI reloads, and save confirmed results that arrive after a roll closes.
+- Give the item tabs one quality outline and mark the selected tab with a short underline.
+
 ## 1.6.0
 
 - Make the Sintezza skin for Blizzard's group roll popup opt-in, including for profiles with the previous enabled default.

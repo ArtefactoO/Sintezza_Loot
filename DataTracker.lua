@@ -44,6 +44,22 @@ local function IsPositiveTime(value)
     return type(value) == "number" and value > 0 and value < math.huge
 end
 
+local function DismissalTime()
+    return (GetServerTime and GetServerTime()) or time()
+end
+
+local function HistoryDismissalKey(session)
+    if not session or not session.historyDropSignature then return end
+    local character = ns.History.character or (UnitGUID and Public(UnitGUID("player")))
+    if type(character) == "string" then return character .. ":" .. session.historyDropSignature end
+end
+
+local function RememberHistoryDismissal(session, key)
+    if not key or session.isDone or not session.rollDeadline then return end
+    local remaining = session.rollDeadline - GetTime()
+    if remaining > 0 then ns.db.dismissedHistoryRolls[key] = DismissalTime() + remaining end
+end
+
 local function ReadTable(value)
     return not ns.IsSecretValue(value) and type(value) == "table" and (not canaccesstable or canaccesstable(value))
 end
@@ -152,6 +168,8 @@ end
 function DataTracker:DismissRoll(rollID)
     if not rollID then return end
     dismissedRolls[rollID] = true
+    local session = rollsByID[rollID]
+    RememberHistoryDismissal(session, HistoryDismissalKey(session))
 
     -- If there is another non-dismissed active roll, switch to it; otherwise hide
     local nextRoll = self:GetNextVisibleRollID(rollID)
@@ -170,7 +188,22 @@ function DataTracker:UndismissRoll(rollID)
     local session = rollsByID[rollID]
     if session then
         session.manualShow = true
+        local key = HistoryDismissalKey(session)
+        if key then ns.db.dismissedHistoryRolls[key] = nil end
     end
+end
+
+function DataTracker:ScheduleExpiry(session)
+    if session.isDone or session.isClosed or session.isSimulated or not session.rollDeadline then return end
+    local grace = type(session.rollID) == "number" and 5 or 0
+    local expires = session.rollDeadline + grace
+    if session.expiresAt == expires then return end
+    session.expiresAt = expires
+    C_Timer.After(math.max(0, expires - GetTime()), function()
+        if rollsByID[session.rollID] ~= session or session.expiresAt ~= expires or session.isDone or session.isClosed then return end
+        session.isClosed = true
+        self:NotifyUI()
+    end)
 end
 
 function DataTracker:ScheduleAutoClose(rollID)
@@ -570,7 +603,7 @@ local function MapModernDropRollState(state, self)
     end
 end
 
-function DataTracker:SyncModernDropInfo(dropInfo, encounterID, liveDrop)
+function DataTracker:SyncModernDropInfo(dropInfo, encounterID, observed)
     if not ReadTable(dropInfo) then return end
     local itemLink = Public(dropInfo.itemHyperlink)
     if type(itemLink) ~= "string" or itemLink == "" then return end
@@ -579,22 +612,41 @@ function DataTracker:SyncModernDropInfo(dropInfo, encounterID, liveDrop)
     if type(lootKey) ~= "number" then return end
     encounterID = Public(encounterID)
     local dropKey = tostring(encounterID or "") .. ":" .. lootKey
-    local targetRollID = "history:" .. dropKey
+    local started, duration = Public(dropInfo.startTime), Public(dropInfo.duration)
+    local signature
+    if type(started) == "number" then
+        local item = itemLink:match("|H(item:[^|]+)|h") or itemLink
+        signature = dropKey .. ":" .. tostring(started) .. ":" .. item
+    end
+    local targetRollID = "history:" .. (signature or dropKey)
     local session = rollsByID[targetRollID]
     local ambiguous
+    local rawWinner = dropInfo.winner
+    local winner = Public(rawWinner)
+    local allPassed = Public(dropInfo.allPassed) == true
+    local isDone = winner ~= nil or ns.IsSecretValue(rawWinner) or allPassed
+    local elapsed = type(started) == "number" and type(observed) == "number" and observed - started
+    local knownAge = type(elapsed) == "number" and elapsed >= 0
+    local recent = knownAge and elapsed <= 180
+    local stillRolling = knownAge and IsPositiveTime(duration) and elapsed < duration
 
     if not session then
         for i = #activeRollOrder, 1, -1 do
             local id = activeRollOrder[i]
             local candidate = rollsByID[id]
-            if candidate and candidate.dropKey == dropKey then session, targetRollID = candidate, id; break end
+            if candidate and candidate.dropKey == dropKey and candidate.itemLink == itemLink
+                and (not signature or candidate.historyDropSignature == signature) then
+                if session then return end
+                session, targetRollID = candidate, id
+                if signature then break end
+            end
         end
     end
-    if not session then
+    if not session and (stillRolling or (isDone and recent)) then
         local match
         for _, id in ipairs(activeRollOrder) do
             local candidate = rollsByID[id]
-            if candidate and not candidate.isSimulated and not candidate.dropKey
+            if candidate and not candidate.isSimulated and (isDone or not candidate.isClosed) and not candidate.dropKey
                 and candidate.itemLink == itemLink then
                 if match then match, ambiguous = nil, true; break end
                 match = candidate
@@ -603,25 +655,10 @@ function DataTracker:SyncModernDropInfo(dropInfo, encounterID, liveDrop)
         if match then session, targetRollID = match, match.rollID end
     end
 
-    local rawWinner = dropInfo.winner
-    local winner = Public(rawWinner)
-    local allPassed = Public(dropInfo.allPassed) == true
-    local isDone = winner ~= nil or ns.IsSecretValue(rawWinner) or allPassed
-    local started = Public(dropInfo.startTime)
-    local observed
-    if (liveDrop or (not isDone and not (session and session.rollDeadline)))
-        and C_LootHistory.GetLootHistoryTime then
-        local ok, value = pcall(C_LootHistory.GetLootHistoryTime)
-        if ok then observed = Public(value) end
-    end
-    local elapsed = type(started) == "number" and type(observed) == "number" and observed - started
-    local recent = type(elapsed) == "number" and elapsed >= 0 and elapsed <= 180
-    if not session and isDone and not ambiguous and not recent then
-        return
-    end
+    if not session and not (isDone and recent or not isDone and stillRolling) then return end
 
-    local itemName, _, itemQuality, _, _, _, _, _, _, itemTexture = ns.GetItemInfo(itemLink)
     if ambiguous and not isDone then return end
+    local itemName, _, itemQuality, _, _, _, _, _, _, itemTexture = ns.GetItemInfo(itemLink)
     local detached = ambiguous or (session and session.detached) or (not session and isDone)
     session = self:CreateOrUpdateRollSession(targetRollID, {
         itemLink = itemLink,
@@ -631,15 +668,19 @@ function DataTracker:SyncModernDropInfo(dropInfo, encounterID, liveDrop)
         isDone = isDone,
     })
     session.dropKey = dropKey
-    if not session.rollDeadline and not session.isDone and type(elapsed) == "number" and elapsed >= 0 then
-        local duration = Public(dropInfo.duration)
-        if IsPositiveTime(duration) and (elapsed <= duration or (liveDrop and recent)) then
-            session.rollDeadline = GetTime() + duration - elapsed
-        end
+    if not session.rollDeadline and not session.isDone and stillRolling then
+        session.rollDeadline = GetTime() + duration - elapsed
+        self:ScheduleExpiry(session)
     end
-    if type(started) == "number" then
-        local item = itemLink:match("|H(item:[^|]+)|h") or itemLink
-        session.historyDropSignature = dropKey .. ":" .. tostring(started) .. ":" .. item
+    session.historyDropSignature = signature or session.historyDropSignature
+    local dismissalKey = HistoryDismissalKey(session)
+    if dismissalKey then
+        local saved = ns.db.dismissedHistoryRolls[dismissalKey]
+        if saved and saved > DismissalTime() then
+            dismissedRolls[targetRollID] = true
+        elseif dismissedRolls[targetRollID] then
+            RememberHistoryDismissal(session, dismissalKey)
+        end
     end
     if not session.historySource and type(encounterID) == "number" and C_LootHistory.GetInfoForEncounter then
         local ok, encounter = pcall(C_LootHistory.GetInfoForEncounter, encounterID)
@@ -739,11 +780,16 @@ function DataTracker:SyncFromLootHistory(encounterID, lootListKey)
     end
 
     -- 2. WoW Forever (1.60.1) / Modern Encounter C_LootHistory API
+    local observed
+    if C_LootHistory.GetLootHistoryTime then
+        local ok, now = pcall(C_LootHistory.GetLootHistoryTime)
+        if ok then observed = Public(now) end
+    end
     encounterID, lootListKey = Public(encounterID), Public(lootListKey)
     if encounterID and lootListKey and C_LootHistory.GetSortedInfoForDrop then
         local ok, dropInfo = pcall(C_LootHistory.GetSortedInfoForDrop, encounterID, lootListKey)
         if ok and ReadTable(dropInfo) then
-            self:SyncModernDropInfo(dropInfo, encounterID, true)
+            self:SyncModernDropInfo(dropInfo, encounterID, observed)
             self:NotifyUI()
             return
         end
@@ -753,7 +799,7 @@ function DataTracker:SyncFromLootHistory(encounterID, lootListKey)
         local ok, drops = pcall(C_LootHistory.GetSortedDropsForEncounter, encounterID)
         if ok and ReadTable(drops) then
             for _, dropInfo in ipairs(drops) do
-                self:SyncModernDropInfo(dropInfo, encounterID)
+                self:SyncModernDropInfo(dropInfo, encounterID, observed)
             end
             self:NotifyUI()
             return
@@ -769,7 +815,7 @@ function DataTracker:SyncFromLootHistory(encounterID, lootListKey)
                     local okDrops, drops = pcall(C_LootHistory.GetSortedDropsForEncounter, id)
                     if okDrops and ReadTable(drops) then
                         for _, dropInfo in ipairs(drops) do
-                            self:SyncModernDropInfo(dropInfo, id)
+                            self:SyncModernDropInfo(dropInfo, id, observed)
                         end
                     end
                 end
@@ -778,6 +824,26 @@ function DataTracker:SyncFromLootHistory(encounterID, lootListKey)
     end
 
     self:NotifyUI()
+end
+
+local function AdoptHistoryRoll(rollID, itemLink, deadline)
+    if type(itemLink) ~= "string" or not deadline then return end
+    local match, matchIndex
+    for index, id in ipairs(activeRollOrder) do
+        local candidate = rollsByID[id]
+        if candidate and type(id) == "string" and candidate.historyDropSignature and candidate.itemLink == itemLink
+            and not candidate.isDone and not candidate.isClosed and candidate.rollDeadline
+            and math.abs(candidate.rollDeadline - deadline) <= 1 then
+            if match then return end
+            match, matchIndex = candidate, index
+        end
+    end
+    if not match then return end
+    local historyID = match.rollID
+    activeRollOrder[matchIndex] = rollID
+    rollsByID[historyID], rollsByID[rollID] = nil, match
+    dismissedRolls[rollID], dismissedRolls[historyID] = dismissedRolls[historyID], nil
+    match.rollID = rollID
 end
 
 function DataTracker:OnStartLootRoll(rollID, rollTime)
@@ -799,8 +865,10 @@ function DataTracker:OnStartLootRoll(rollID, rollTime)
         texture, name, count, quality = GetLootRollItemInfo(rollID)
     end
     local link = type(GetLootRollItemLink) == "function" and GetLootRollItemLink(rollID) or nil
+    link = Public(link)
+    if not existing then AdoptHistoryRoll(rollID, link, deadline) end
 
-    self:CreateOrUpdateRollSession(rollID, {
+    local session = self:CreateOrUpdateRollSession(rollID, {
         itemLink = link,
         itemName = name,
         itemTexture = texture,
@@ -810,6 +878,7 @@ function DataTracker:OnStartLootRoll(rollID, rollTime)
         isSimulated = false,
         rollDeadline = deadline,
     })
+    self:ScheduleExpiry(session)
 
     -- Focus the newly started roll if autoOpen is enabled
     currentRollID = rollID
@@ -913,6 +982,13 @@ end
 
 function DataTracker:Init()
     BuildChatPatterns()
+    if type(ns.db.dismissedHistoryRolls) ~= "table" then ns.db.dismissedHistoryRolls = {} end
+    local now = DismissalTime()
+    for key, expires in pairs(ns.db.dismissedHistoryRolls) do
+        if type(key) ~= "string" or not IsPositiveTime(expires) or expires <= now then
+            ns.db.dismissedHistoryRolls[key] = nil
+        end
+    end
 
     ns:RegisterEvent("START_LOOT_ROLL", function(_, rollID, rollTime)
         DataTracker:OnStartLootRoll(rollID, rollTime)

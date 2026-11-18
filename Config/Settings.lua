@@ -319,7 +319,7 @@ function SettingsModule:Init()
     end)
 
     StartPage("window")
-    if ns.IsForever then
+    if ns.IsForever and T.SkinLootRollPopup then
         Toggle(L.SETTINGS_SKIN_GROUP_LOOT, L.SETTINGS_SKIN_GROUP_LOOT_HELP, "skinGroupLoot")
     end
     Place(Sintezza_Theme:CreateWindowOptions(page, T, {

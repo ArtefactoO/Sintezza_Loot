@@ -6,7 +6,7 @@ ns.ICON = Sintezza_Theme.icons.Sintezza_Loot
 local rawVersion = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
     or (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version"))
 if not rawVersion or rawVersion:find("project%-version") then
-    rawVersion = "1.6.0"
+    rawVersion = "1.6.1"
 end
 ns.VERSION = rawVersion
 ns.DEFAULT_AUTO_CLOSE_DELAY = 10

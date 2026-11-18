@@ -24,6 +24,8 @@ For the Drowned City, map 2970 and quest 95775 correspond to the user's existing
 
 TrackerRefresh.lua loads the production roster and tracker modules with isolated Lua environments. It checks a single metadata read per unit, full-name aliases, missing and secret metadata, retained cached class/role, solo and raid membership, and self deduplication. The tracker cases check one evaluation per visible roll, selected-tab changes, single-item refresh, and hidden/dismissed paths.
 
+TrackerLifecycle.lua sends native and loot-history events to the real tracker. It checks deadlines, malformed or secret history times, migrated dismissal state, duplicate starts, key reuse and late results. The reload case recreates Lua state with the same saved data.
+
 ## Coverage for 1.6.0
 
 - Empty visits and unfinished or simulated rolls create no saved run. The first recorded roll saves the original visit time.

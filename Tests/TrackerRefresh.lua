@@ -77,6 +77,7 @@ function methods:SetWidth(value) self.width = value end
 function methods:SetTexture(value) self.texture = value end
 function methods:SetText(value) self.text = value end
 function methods:SetBackdropBorderColor(...) self.borderColor = { ... } end
+function methods:SetShown(shown) self.shown = shown end
 function methods:Show() self.shown = true end
 function methods:Hide() self.shown = false end
 function methods:IsShown() return self.shown end
@@ -118,7 +119,7 @@ view.frame = widget()
 view.frame.tabs = {}
 for i = 1, 6 do
     local tab = widget()
-    tab.icon, tab.badge, tab.iconBorder = widget(), widget(), widget()
+    tab.icon, tab.badge, tab.selected = widget(), widget(), widget()
     view.frame.tabs[i] = tab
 end
 view.frame.itemIcon, view.frame.itemBorder, view.frame.itemTitle = widget(), widget(), widget()
@@ -130,10 +131,13 @@ view:Refresh(false)
 assert(evaluations[1] == 1 and evaluations[2] == 1 and evaluations[3] == 1,
     "A multi-item refresh should evaluate the current roll once")
 assert(view.frame.tabs[2].badge.text == "2/3")
+assert(view.frame.tabs[2].borderColor[4] == .9 and view.frame.tabs[2].selected.shown)
+assert(not view.frame.tabs[1].selected.shown)
 selected = 1
 view:Refresh(false)
 assert(evaluations[1] == 2 and evaluations[2] == 2 and evaluations[3] == 2)
 assert(view.currentEval == evaluated[1] and view.frame.footerSession == sessions[1])
+assert(view.frame.tabs[1].selected.shown and not view.frame.tabs[2].selected.shown)
 sessions = { sessions[1] }
 view:Refresh(false)
 assert(evaluations[1] == 3, "A single-item refresh still evaluates its player list")

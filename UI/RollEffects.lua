@@ -107,58 +107,66 @@ function Effects:PreviewWin(item)
     if not shown or accepted == false then ns:Print(L.WIN_PREVIEW_UNAVAILABLE) end
 end
 
-local function EllesmereStylesRolls()
-    local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded
-    if not isLoaded or not isLoaded("EllesmereUIBlizzardSkin") then return false end
+local ELLESMERE_SKIN = "EllesmereUIBlizzardSkin"
+
+local function ClaimGroupRollSkin()
+    local modules = EllesmereUI and EllesmereUI._ModuleNS
+    local module = modules and modules[ELLESMERE_SKIN]
+    local engine = module and module.WSkin
+    local getStyle = engine and engine.GetStyle
+    if type(getStyle) ~= "function" then return end
+
+    -- The window engine installs the roll skin at PLAYER_LOGIN. Suppress only
+    -- that installation and keep the saved style available to Ellesmere's options.
+    local active = true
+    local function GetStyle(key, ...)
+        if active and key == "lootroll" then return "off" end
+        return getStyle(key, ...)
+    end
+    engine.GetStyle = GetStyle
+    return function()
+        active = false
+        if engine.GetStyle == GetStyle then engine.GetStyle = getStyle end
+    end
+end
+
+local function EllesmereRollSkinEnabled()
     local getStyle = EllesmereUI and EllesmereUI.GetBlizzWindowStyle
     if type(getStyle) == "function" then return getStyle("lootroll") ~= "off" end
     return not EllesmereUIDB or EllesmereUIDB.reskinLootRoll ~= false
 end
 
-local function StyleGroupRoll(frame)
-    if not CanStyle(frame) then return end
-    local item, timer = frame.IconFrame, frame.Timer
-    if not CanStyle(item) or not CanStyle(timer) then return end
-    for _, region in ipairs({ "Background", "Border", "Name" }) do
-        if not CanStyle(frame[region]) then return end
-    end
-    for _, region in ipairs({ "Icon", "Count" }) do
-        if not CanStyle(item[region]) then return end
-    end
-    if not CanStyle(timer.Background) then return end
-
-    -- Blizzard keeps the timer below the popup. Put the surface behind its fill on the same frame.
-    local edge = timer:CreateTexture(nil, "BACKGROUND", nil, -3)
-    edge:SetAllPoints(frame)
-    Sintezza_Theme:Tint(edge, "SetColorTexture", T.line)
-    local background = timer:CreateTexture(nil, "BACKGROUND", nil, -2)
-    background:SetPoint("TOPLEFT", frame, "TOPLEFT", 1, -1)
-    background:SetPoint("BOTTOMRIGHT", frame, "BOTTOMRIGHT", -1, 1)
-    Sintezza_Theme:Tint(background, "SetColorTexture", T.bg)
-
-    frame.Background:SetAlpha(0)
-    frame.Border:SetAlpha(0)
-    item.Icon:SetTexCoord(.08, .92, .08, .92)
-    ns.InterfaceFonts:ApplyTheme(frame.Name, 12, "")
-    ns.InterfaceFonts:ApplyTheme(item.Count, 10, "OUTLINE")
-
-    timer.Background:SetAlpha(0)
-    timer:SetStatusBarTexture("Interface\\Buttons\\WHITE8X8")
-    Sintezza_Theme:Tint(timer, "SetStatusBarColor", T.accent)
-end
-
 function Effects:Init()
-    if not ns.IsForever then return end
+    if not ns.IsForever or ns.db.skinGroupLoot ~= true or not T.SkinLootRollPopup then return end
+
+    local isLoaded = C_AddOns and C_AddOns.IsAddOnLoaded
+    local releaseClaim, loginFinished
+    if isLoaded and isLoaded(ELLESMERE_SKIN) then
+        releaseClaim = ClaimGroupRollSkin()
+    else
+        ns:RegisterEvent("ADDON_LOADED", function(_, addonName)
+            if addonName == ELLESMERE_SKIN and not loginFinished and not releaseClaim then
+                releaseClaim = ClaimGroupRollSkin()
+            end
+        end)
+    end
+
     local pending
     local function Apply()
         pending = InCombatLockdown()
         if pending then return end
         for index = 1, 4 do
-            StyleGroupRoll(_G["GroupLootFrame" .. index])
+            T:SkinLootRollPopup(_G["GroupLootFrame" .. index])
         end
     end
     ns:RegisterEvent("PLAYER_LOGIN", function()
-        if ns.db.skinGroupLoot == true and not EllesmereStylesRolls() then Apply() end
+        loginFinished = true
+        if releaseClaim then
+            C_Timer.After(0, releaseClaim)
+        elseif isLoaded and isLoaded(ELLESMERE_SKIN) and EllesmereRollSkinEnabled() then
+            return
+        end
+        Apply()
     end)
     ns:RegisterEvent("PLAYER_REGEN_ENABLED", function()
         if pending then Apply() end
