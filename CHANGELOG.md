@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.6.2
+
+- Enable the Sintezza skin for Blizzard's group roll popup by default on new profiles. Existing on and off settings are preserved.
+
 ## 1.6.1
 
 - Give the optional Sintezza skin priority over EllesmereUI for Blizzard's group roll popup after a UI reload, without changing the saved EllesmereUI style.

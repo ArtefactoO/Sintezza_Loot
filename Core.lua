@@ -6,7 +6,7 @@ ns.ICON = Sintezza_Theme.icons.Sintezza_Loot
 local rawVersion = C_AddOns and C_AddOns.GetAddOnMetadata and C_AddOns.GetAddOnMetadata(addonName, "Version")
     or (GetAddOnMetadata and GetAddOnMetadata(addonName, "Version"))
 if not rawVersion or rawVersion:find("project%-version") then
-    rawVersion = "1.6.1"
+    rawVersion = "1.6.2"
 end
 ns.VERSION = rawVersion
 ns.DEFAULT_AUTO_CLOSE_DELAY = 10
@@ -16,7 +16,7 @@ local DEFAULT_SETTINGS = {
     autoOpen = true,
     showRoleIcons = true,
     showRollTimer = true,
-    skinGroupLoot = false,
+    skinGroupLoot = true,
     autoSwitchOnHover = true,
     keepOpenAfterMyRoll = true,
     hidePassed = false,
@@ -140,11 +140,6 @@ end
 function ns:InitDB()
     if type(Sintezza_LootDB) ~= "table" then
         Sintezza_LootDB = {}
-    end
-    -- Older builds saved the enabled default even if the checkbox was never used.
-    if not Sintezza_LootDB.groupLootSkinOptInMigrated then
-        if Sintezza_LootDB.skinGroupLoot == true then Sintezza_LootDB.skinGroupLoot = false end
-        Sintezza_LootDB.groupLootSkinOptInMigrated = true
     end
     for k, v in pairs(DEFAULT_SETTINGS) do
         if Sintezza_LootDB[k] == nil then
